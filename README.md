@@ -1,2 +1,3 @@
-# survival
-A tool to show survial scenarios for CockroachDB
+# Survival
+
+A tool to show survival scenarios for CockroachDB
