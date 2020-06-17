@@ -1,0 +1,120 @@
+.App {
+    text-align: center;
+}
+
+.App-header {
+    background-color: #282c34;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+
+.App-link {
+    color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.App-table {
+    border-spacing: 1ex;
+    font-size: medium;
+    text-align: center;
+}
+
+.App-input {
+    font-size: large;
+    text-align: center;
+}
+
+.App-container {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.Box {
+    width: fit-content;
+    height: fit-content;
+    display: flow-root;
+    border: 5px;
+    padding: 10px;
+    margin: 10px;
+    background-color: white;
+    border-color: black;
+    border-style: groove;
+    color: black;
+    font-weight: bold;
+}
+
+.Box-failed {
+    width: fit-content;
+    height: fit-content;
+    display: flow-root;
+    border: 5px;
+    padding: 10px;
+    margin: 10px;
+    background-color: pink;
+    border-color: red;
+    border-style: groove;
+    color: red;
+    font-weight: bold;
+}
+
+.Box-empty {
+    width: fit-content;
+    height: fit-content;
+    display: flow-root;
+    border: 5px;
+    padding: 10px;
+    margin: 10px;
+    background-color: lightgrey;
+    border-color: black;
+    border-style: groove;
+    color: black;
+    font-weight: bold;
+}
+
+.App-form {
+    display: inline-table;
+    width: fit-content;
+    align-content: center;
+}
+
+.Replicas-full {
+    color: blue;
+}
+
+.Replicas-empty {
+    color: black;
+}
+
+.Underreplicated {
+    color: red;
+    font-size: x-large;
+}
+
+.FailureMode {
+    font-size: x-large;
+    text-align: center;
+}
+
+.FailureSelect {
+    font-size: x-large;
+    text-align: center;
+}
+
+.FailureResults {
+    font-size: x-large;
+    color: yellow;
+}
