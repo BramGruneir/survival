@@ -103,3 +103,13 @@
     color: red;
     font-size: x-large;
 }
+
+.FailureMode {
+    font-size: x-large;
+    text-align: center;
+}
+
+.FailureSelect {
+    font-size: x-large;
+    text-align: center;
+}
