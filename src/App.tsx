@@ -2,10 +2,15 @@ import React from 'react';
 import './App.css';
 
 interface NodeProps {
-  key: number;
+  key: string;
   id: number;
   failed: boolean;
   replicas: number;
+}
+
+function generateKey(props: NodeProps): string {
+  //return `${props.id}-${props.replicas}-${props.failed}`;
+  return Math.random().toString();
 }
 
 function pickBoxClass(node: NodeProps): string {
@@ -158,31 +163,58 @@ class MainForm extends React.Component<{}, MainFormState> {
   }
 
   componentDidMount() {
-    this.update()
+    let curState = this.getCurrentState();
+    this.setState(this.update(curState))
+  }
+
+  getCurrentState(): MainFormState {
+    return {
+      numberRegions: this.state.numberRegions,
+      DCsPerRegion: this.state.DCsPerRegion,
+      AZsPerDC: this.state.AZsPerDC,
+      NodesPerAZ: this.state.NodesPerAZ,
+      replicationFactor: this.state.replicationFactor,
+      failureMode: this.state.failureMode,
+      failedRegions: this.state.failedRegions,
+      failedDCs: this.state.failedDCs,
+      failedAZs: this.state.failedAZs,
+      failedNodes: this.state.failedNodes,
+      deadReplicas: this.state.deadReplicas,
+      allowableDead: this.state.allowableDead,
+      regions: [],
+    };
   }
 
   handleNumberRegionsChange(event: any) {
-    let value = limit(event.target.value, 1, 10);
-    this.setState({ numberRegions: value });
-    this.update();
+    let value = parseInt(event.target.value)
+    value = limit(value, 1, 10);
+    let curState = this.getCurrentState();
+    curState.numberRegions = value;
+    this.setState(this.update(curState))
   }
   handleDCsPerRegionChange(event: any) {
-    let value = limit(event.target.value, 1, 10);
-    this.setState({ DCsPerRegion: value });
-    this.update();
+    let value = parseInt(event.target.value)
+    value = limit(value, 1, 10);
+    let curState = this.getCurrentState();
+    curState.DCsPerRegion = value;
+    this.setState(this.update(curState))
   }
   handleAZsPerDCChange(event: any) {
-    let value = limit(event.target.value, 1, 10);
-    this.setState({ AZsPerDC: value });
-    this.update();
+    let value = parseInt(event.target.value)
+    value = limit(value, 1, 10);
+    let curState = this.getCurrentState();
+    curState.AZsPerDC = value;
+    this.setState(this.update(curState))
   }
   handleNodesPerAZChange(event: any) {
-    let value = limit(event.target.value, 1, 100);
-    this.setState({ NodesPerAZ: value });
-    this.update();
+    let value = parseInt(event.target.value)
+    value = limit(value, 1, 100);
+    let curState = this.getCurrentState();
+    curState.NodesPerAZ = value;
+    this.setState(this.update(curState))
   }
   handleReplicationFactorChange(event: any) {
-    let value = event.target.value;
+    let value = parseInt(event.target.value);
     if (value % 2 === 0) {
       if (this.state.replicationFactor > value) {
         value--;
@@ -191,25 +223,25 @@ class MainForm extends React.Component<{}, MainFormState> {
       }
     }
     value = limit(value, 1, 99);
-    this.setState({
-      replicationFactor: value,
-      allowableDead: Math.floor(this.state.replicationFactor / 2),
-    });
-    this.update();
+    let curState = this.getCurrentState();
+    curState.replicationFactor = value;
+    this.setState(this.update(curState), this.forceUpdate)
   }
   handleFailureModeChange(event: any) {
-    this.setState({ failureMode: event.target.value });
-    this.update();
+    let curState = this.getCurrentState();
+    curState.failureMode = parseInt(event.target.value);
+    this.setState(this.update(curState))
   }
 
-  update() {
+  update(state: MainFormState): MainFormState {
     // Spec out the whole system.
+    state.allowableDead = Math.floor(state.replicationFactor / 2);
 
     // Regions
-    let regions: Array<RegionProps> = [];
-    for (let r = 0; r < this.state.numberRegions; r++) {
+    state.regions = [];
+    for (let r = 0; r < state.numberRegions; r++) {
       let regionProps: RegionProps = {
-        key: r,
+        key: "",
         id: r + 1,
         failed: false,
         datacenters: [],
@@ -217,9 +249,9 @@ class MainForm extends React.Component<{}, MainFormState> {
       }
 
       // Data Centers
-      for (let d = 0; d < this.state.DCsPerRegion; d++) {
+      for (let d = 0; d < state.DCsPerRegion; d++) {
         let dataCenterProps: DataCenterProps = {
-          key: d,
+          key: "",
           id: d + 1,
           failed: false,
           replicas: 0,
@@ -227,9 +259,9 @@ class MainForm extends React.Component<{}, MainFormState> {
         }
 
         // Availability Zones
-        for (let a = 0; a < this.state.AZsPerDC; a++) {
+        for (let a = 0; a < state.AZsPerDC; a++) {
           let availabilityZoneProps: AvailabilityZoneProps = {
-            key: a,
+            key: "",
             id: a + 1,
             failed: false,
             replicas: 0,
@@ -237,9 +269,9 @@ class MainForm extends React.Component<{}, MainFormState> {
           }
 
           // Nodes
-          for (let a = 0; a < this.state.NodesPerAZ; a++) {
+          for (let a = 0; a < state.NodesPerAZ; a++) {
             let nodeProps: NodeProps = {
-              key: a,
+              key: "",
               id: a + 1,
               failed: false,
               replicas: 0,
@@ -250,38 +282,38 @@ class MainForm extends React.Component<{}, MainFormState> {
         }
         regionProps.datacenters.push(dataCenterProps);
       }
-      regions.push(regionProps);
+      state.regions.push(regionProps);
     }
 
     // Add the example range.  This is not fun, there must be a better way.
     // Replicas per region
-    for (let i = 0; i < this.state.replicationFactor; i++) {
-      let region = i % this.state.numberRegions;
-      regions[region].replicas++;
+    for (let i = 0; i < state.replicationFactor; i++) {
+      let region = i % state.numberRegions;
+      state.regions[region].replicas++;
     }
     // Replicas per DC
-    regions.forEach(r => {
+    state.regions.forEach(r => {
       for (let i = 0; i < r.replicas; i++) {
-        let dc = i % this.state.DCsPerRegion;
+        let dc = i % state.DCsPerRegion;
         r.datacenters[dc].replicas++;
       }
     });
     // Replicas per AZ
-    regions.forEach(r =>
+    state.regions.forEach(r =>
       r.datacenters.forEach(dc => {
         for (let i = 0; i < dc.replicas; i++) {
-          let az = i % this.state.AZsPerDC;
+          let az = i % state.AZsPerDC;
           dc.availabilityZones[az].replicas++;
         }
       })
     );
     // Replicas per Nodes
-    regions.forEach(r =>
+    state.regions.forEach(r =>
       r.datacenters.forEach(dc =>
         dc.availabilityZones.forEach(az => {
           // This is technically not needed, can't put more than one replica on a node.
           for (let i = 0; i < az.replicas; i++) {
-            let n = i % this.state.NodesPerAZ;
+            let n = i % state.NodesPerAZ;
             az.nodes[n].replicas++;
           }
         })
@@ -289,24 +321,24 @@ class MainForm extends React.Component<{}, MainFormState> {
     );
 
     // Check for failures.
-    let deadReplicas = 0;
-    let failedRegions = 0;
-    let failedDCs = 0;
-    let failedAZs = 0;
-    let failedNodes = 0;
+    state.deadReplicas = 0;
+    state.failedRegions = 0;
+    state.failedDCs = 0;
+    state.failedAZs = 0;
+    state.failedNodes = 0;
 
     // Regions
-    if (this.state.failureMode === FailureMode.Region) {
-      for (let i = 0; i < this.state.numberRegions; i++) {
-        if (regions[i].replicas === 0) {
+    if (state.failureMode === FailureMode.Region) {
+      for (let i = 0; i < state.numberRegions; i++) {
+        if (state.regions[i].replicas === 0) {
           // An empty region means that the range never wrapped and we know the
           // rest of Regions or DCs will be empty.
           break;
         }
-        if (deadReplicas + regions[i].replicas <= this.state.allowableDead) {
-          regions[i].failed = true;
-          deadReplicas += regions[i].replicas;
-          failedRegions++;
+        if (state.deadReplicas + state.regions[i].replicas <= state.allowableDead) {
+          state.regions[i].failed = true;
+          state.deadReplicas += state.regions[i].replicas;
+          state.failedRegions++;
         } else {
           // Don't continue here as these are traversed in order. This ensures
           // we don't kill a region with less replicas. We want worst case
@@ -317,36 +349,36 @@ class MainForm extends React.Component<{}, MainFormState> {
     }
 
     // DCs
-    if (this.state.failureMode > FailureMode.None &&
-      this.state.failureMode <= FailureMode.DataCenter &&
-      deadReplicas < this.state.allowableDead) {
+    if (state.failureMode > FailureMode.None &&
+      state.failureMode <= FailureMode.DataCenter &&
+      state.deadReplicas < state.allowableDead) {
       // Traverse the first DC in each region, then the second DC in each region ...
       let i = -1;
       let j = 0;
-      while (deadReplicas < this.state.allowableDead) {
+      while (state.deadReplicas < state.allowableDead) {
         i++;
-        if (i >= this.state.numberRegions) {
+        if (i >= state.numberRegions) {
           i = 0;
           j++;
-          if (j >= this.state.DCsPerRegion) {
+          if (j >= state.DCsPerRegion) {
             // We are at the end.
             break;
           }
         }
-        if (regions[i].failed) {
+        if (state.regions[i].failed) {
           // Skip all failed regions.
           continue
         }
-        if ((regions[i].replicas === 0) ||
-          (regions[i].datacenters[j].replicas === 0)) {
+        if ((state.regions[i].replicas === 0) ||
+          (state.regions[i].datacenters[j].replicas === 0)) {
           // An empty region or datacenter means that the range never wrapped
           // and we know the rest of Regions or DCs will be empty.
           break;
         }
-        if (deadReplicas + regions[i].datacenters[j].replicas <= this.state.allowableDead) {
-          regions[i].datacenters[j].failed = true;
-          deadReplicas += regions[i].datacenters[j].replicas;
-          failedDCs++;
+        if (state.deadReplicas + state.regions[i].datacenters[j].replicas <= state.allowableDead) {
+          state.regions[i].datacenters[j].failed = true;
+          state.deadReplicas += state.regions[i].datacenters[j].replicas;
+          state.failedDCs++;
         } else {
           // Don't continue here as these are traversed in order. This ensures
           // we don't kill a DC with less replicas. We want worst case scenario
@@ -357,9 +389,9 @@ class MainForm extends React.Component<{}, MainFormState> {
     }
 
     // AZs
-    if (this.state.failureMode > FailureMode.None &&
-      this.state.failureMode <= FailureMode.AvailabilityZone &&
-      deadReplicas < this.state.allowableDead) {
+    if (state.failureMode > FailureMode.None &&
+      state.failureMode <= FailureMode.AvailabilityZone &&
+      state.deadReplicas < state.allowableDead) {
       // Traversal order for a 3x3x3: (Region-DC-AZ)
       // 1-1-1, 2-1-1, 3-1-1,
       // 1-2-1, 2-2-1, 3-2-1,
@@ -373,37 +405,37 @@ class MainForm extends React.Component<{}, MainFormState> {
       let i = -1;
       let j = 0;
       let k = 0;
-      while (deadReplicas < this.state.allowableDead) {
+      while (state.deadReplicas < state.allowableDead) {
         i++;
-        if (i >= this.state.numberRegions) {
+        if (i >= state.numberRegions) {
           i = 0;
           j++;
-          if (j >= this.state.DCsPerRegion) {
+          if (j >= state.DCsPerRegion) {
             j = 0;
             k++;
-            if (k >= this.state.AZsPerDC) {
+            if (k >= state.AZsPerDC) {
               // We are at the end.
               break;
             }
           }
         }
-        if (regions[i].failed ||
-          regions[i].datacenters[j].failed) {
+        if (state.regions[i].failed ||
+          state.regions[i].datacenters[j].failed) {
           // Skip all failed regions and datacenters.
           continue;
         }
-        if ((regions[i].replicas === 0) ||
-          (regions[i].datacenters[j].replicas === 0) ||
-          (regions[i].datacenters[j].availabilityZones[k].replicas === 0)) {
+        if ((state.regions[i].replicas === 0) ||
+          (state.regions[i].datacenters[j].replicas === 0) ||
+          (state.regions[i].datacenters[j].availabilityZones[k].replicas === 0)) {
           // An empty region, DC or AZ means that the range never wrapped
           // and we know the rest of Regions, DCs or AZs will be empty.
           break;
         }
 
-        if (deadReplicas + regions[i].datacenters[j].availabilityZones[k].replicas <= this.state.allowableDead) {
-          regions[i].datacenters[j].availabilityZones[k].failed = true;
-          deadReplicas += regions[i].datacenters[j].availabilityZones[k].replicas;
-          failedAZs++;
+        if (state.deadReplicas + state.regions[i].datacenters[j].availabilityZones[k].replicas <= state.allowableDead) {
+          state.regions[i].datacenters[j].availabilityZones[k].failed = true;
+          state.deadReplicas += state.regions[i].datacenters[j].availabilityZones[k].replicas;
+          state.failedAZs++;
         } else {
           // Don't continue here as these are traversed in order. This ensures
           // we don't kill a AZ with less replicas. We want worst case scenario
@@ -414,9 +446,9 @@ class MainForm extends React.Component<{}, MainFormState> {
     }
 
     // Nodes
-    if (this.state.failureMode > FailureMode.None &&
-      this.state.failureMode <= FailureMode.Node &&
-      deadReplicas < this.state.allowableDead) {
+    if (state.failureMode > FailureMode.None &&
+      state.failureMode <= FailureMode.Node &&
+      state.deadReplicas < state.allowableDead) {
       // Traversal order for a 2x2x2x2: (Region-DC-AZ-Nodes)
       // 1-1-1-1, 2-1-1-1,
       // 1-2-1-1, 2-2-1-1,
@@ -431,44 +463,44 @@ class MainForm extends React.Component<{}, MainFormState> {
       let j = 0;
       let k = 0;
       let l = 0;
-      while (deadReplicas < this.state.allowableDead) {
+      while (state.deadReplicas < state.allowableDead) {
         i++;
-        if (i >= this.state.numberRegions) {
+        if (i >= state.numberRegions) {
           i = 0;
           j++;
-          if (j >= this.state.DCsPerRegion) {
+          if (j >= state.DCsPerRegion) {
             j = 0;
             k++;
-            if (k >= this.state.AZsPerDC) {
+            if (k >= state.AZsPerDC) {
               k = 0;
               l++;
-              if (l >= this.state.NodesPerAZ) {
+              if (l >= state.NodesPerAZ) {
                 // We are at the end.
                 break;
               }
             }
           }
         }
-        if (regions[i].failed ||
-          regions[i].datacenters[j].failed ||
-          regions[i].datacenters[j].availabilityZones[k].failed
+        if (state.regions[i].failed ||
+          state.regions[i].datacenters[j].failed ||
+          state.regions[i].datacenters[j].availabilityZones[k].failed
         ) {
           // Skip all failed regions, DCs and AZs.
           continue;
         }
-        if ((regions[i].replicas === 0) ||
-          (regions[i].datacenters[j].replicas === 0) ||
-          (regions[i].datacenters[j].availabilityZones[k].replicas === 0) ||
-          (regions[i].datacenters[j].availabilityZones[k].nodes[l].replicas === 0)) {
+        if ((state.regions[i].replicas === 0) ||
+          (state.regions[i].datacenters[j].replicas === 0) ||
+          (state.regions[i].datacenters[j].availabilityZones[k].replicas === 0) ||
+          (state.regions[i].datacenters[j].availabilityZones[k].nodes[l].replicas === 0)) {
           // An empty region, DC, AZ or node means that the range never wrapped
           // and we know the rest of Regions, DCs, AZs or nodes will be empty.
           break;
         }
 
-        if (deadReplicas + regions[i].datacenters[j].availabilityZones[k].nodes[l].replicas <= this.state.allowableDead) {
-          regions[i].datacenters[j].availabilityZones[k].nodes[l].failed = true;
-          deadReplicas += regions[i].datacenters[j].availabilityZones[k].nodes[l].replicas;
-          failedNodes++;
+        if (state.deadReplicas + state.regions[i].datacenters[j].availabilityZones[k].nodes[l].replicas <= state.allowableDead) {
+          state.regions[i].datacenters[j].availabilityZones[k].nodes[l].failed = true;
+          state.deadReplicas += state.regions[i].datacenters[j].availabilityZones[k].nodes[l].replicas;
+          state.failedNodes++;
         } else {
           // Don't continue here as these are traversed in order. This ensures
           // we don't kill a node with less replicas. We want worst case
@@ -480,14 +512,20 @@ class MainForm extends React.Component<{}, MainFormState> {
       }
     }
 
-    this.setState({
-      regions: regions,
-      deadReplicas: deadReplicas,
-      failedRegions: failedRegions,
-      failedDCs: failedDCs,
-      failedAZs: failedAZs,
-      failedNodes: failedNodes,
-    })
+    state.regions.forEach(r => {
+      r.key = generateKey(r);
+      r.datacenters.forEach(dc => {
+        dc.key = generateKey(dc);
+        dc.availabilityZones.forEach(az => {
+          az.key = generateKey(az);
+          az.nodes.forEach(n => {
+            n.key = generateKey(n);
+          });
+        });
+      });
+    });
+
+    return state;
   }
 
   render() {
@@ -496,12 +534,11 @@ class MainForm extends React.Component<{}, MainFormState> {
     );
     let nodeCount = this.state.numberRegions * this.state.DCsPerRegion * this.state.AZsPerDC * this.state.NodesPerAZ;
     let failureResults: Array<JSX.Element> = [];
-    debugger
     if (this.state.failureMode > FailureMode.None) {
       switch (this.state.failureMode) {
         case (FailureMode.Region):
           failureResults = [
-            <p>You can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead === 1 ? "" : "s"}.</p>,
+            <p>With {this.state.replicationFactor}, you can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead === 1 ? "" : "s"}.</p>,
             <p>You can lose {this.state.failedRegions} region{this.state.failedRegions === 1 ? "" : "s"}.</p>,
             <p>You can lose {this.state.failedDCs} additional data center{this.state.failedDCs === 1 ? "" : "s"}.</p>,
             <p>You can lose {this.state.failedAZs} additional availability zone{this.state.failedAZs === 1 ? "" : "s"}.</p>,
