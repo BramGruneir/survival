@@ -186,35 +186,35 @@ class MainForm extends React.Component<{}, MainFormState> {
   }
 
   handleNumberRegionsChange(event: any) {
-    let value = parseInt(event.target.value)
+    let value = parseInt(event.target.value) || 1;
     value = limit(value, 1, 10);
     let curState = this.getCurrentState();
     curState.numberRegions = value;
     this.setState(this.update(curState))
   }
   handleDCsPerRegionChange(event: any) {
-    let value = parseInt(event.target.value)
+    let value = parseInt(event.target.value) || 1;
     value = limit(value, 1, 10);
     let curState = this.getCurrentState();
     curState.DCsPerRegion = value;
     this.setState(this.update(curState))
   }
   handleAZsPerDCChange(event: any) {
-    let value = parseInt(event.target.value)
+    let value = parseInt(event.target.value) || 1;
     value = limit(value, 1, 10);
     let curState = this.getCurrentState();
     curState.AZsPerDC = value;
     this.setState(this.update(curState))
   }
   handleNodesPerAZChange(event: any) {
-    let value = parseInt(event.target.value)
+    let value = parseInt(event.target.value) || 1;
     value = limit(value, 1, 100);
     let curState = this.getCurrentState();
     curState.NodesPerAZ = value;
     this.setState(this.update(curState))
   }
   handleReplicationFactorChange(event: any) {
-    let value = parseInt(event.target.value);
+    let value = parseInt(event.target.value) || 1;
     if (value % 2 === 0) {
       if (this.state.replicationFactor > value) {
         value--;
@@ -229,7 +229,7 @@ class MainForm extends React.Component<{}, MainFormState> {
   }
   handleFailureModeChange(event: any) {
     let curState = this.getCurrentState();
-    curState.failureMode = parseInt(event.target.value);
+    curState.failureMode = parseInt(event.target.value) || FailureMode.None;
     this.setState(this.update(curState))
   }
 
@@ -538,32 +538,32 @@ class MainForm extends React.Component<{}, MainFormState> {
       switch (this.state.failureMode) {
         case (FailureMode.Region):
           failureResults = [
-            <p>With {this.state.replicationFactor}, you can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead === 1 ? "" : "s"}.</p>,
-            <p>You can lose {this.state.failedRegions} region{this.state.failedRegions === 1 ? "" : "s"}.</p>,
-            <p>You can lose {this.state.failedDCs} additional data center{this.state.failedDCs === 1 ? "" : "s"}.</p>,
-            <p>You can lose {this.state.failedAZs} additional availability zone{this.state.failedAZs === 1 ? "" : "s"}.</p>,
-            <p>You can lose {this.state.failedNodes} additional node{this.state.failedNodes === 1 ? "" : "s"}.</p>,
+            <p key="r1">With {this.state.replicationFactor}x replication you can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead === 1 ? "" : "s"}.</p>,
+            <p key="r2">You can lose {this.state.failedRegions} region{this.state.failedRegions === 1 ? "" : "s"}.</p>,
+            <p key="r3">You can lose {this.state.failedDCs} additional data center{this.state.failedDCs === 1 ? "" : "s"}.</p>,
+            <p key="r4">You can lose {this.state.failedAZs} additional availability zone{this.state.failedAZs === 1 ? "" : "s"}.</p>,
+            <p key="r5">You can lose {this.state.failedNodes} additional node{this.state.failedNodes === 1 ? "" : "s"}.</p>,
           ]
           break;
         case (FailureMode.DataCenter):
           failureResults = [
-            <p>You can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead === 1 ? "" : "s"}.</p>,
-            <p>You can lose {this.state.failedDCs} data center{this.state.failedDCs === 1 ? "" : "s"}.</p>,
-            <p>You can lose {this.state.failedAZs} additional availability zone{this.state.failedAZs === 1 ? "" : "s"}.</p>,
-            <p>You can lose {this.state.failedNodes} additional node{this.state.failedNodes === 1 ? "" : "s"}.</p>,
+            <p key="d1">With {this.state.replicationFactor}x replication you can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead === 1 ? "" : "s"}.</p>,
+            <p key="d2">You can lose {this.state.failedDCs} data center{this.state.failedDCs === 1 ? "" : "s"}.</p>,
+            <p key="d3">You can lose {this.state.failedAZs} additional availability zone{this.state.failedAZs === 1 ? "" : "s"}.</p>,
+            <p key="d4">You can lose {this.state.failedNodes} additional node{this.state.failedNodes === 1 ? "" : "s"}.</p>,
           ]
           break;
         case (FailureMode.AvailabilityZone):
           failureResults = [
-            <p>You can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead === 1 ? "" : "s"}.</p>,
-            <p>You can lose {this.state.failedAZs} availability zone{this.state.failedAZs === 1 ? "" : "s"}.</p>,
-            <p>You can lose {this.state.failedNodes} additional node{this.state.failedNodes === 1 ? "" : "s"}.</p>,
+            <p key="a1">With {this.state.replicationFactor}x replication you can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead === 1 ? "" : "s"}.</p>,
+            <p key="a2">You can lose {this.state.failedAZs} availability zone{this.state.failedAZs === 1 ? "" : "s"}.</p>,
+            <p key="a3">You can lose {this.state.failedNodes} additional node{this.state.failedNodes === 1 ? "" : "s"}.</p>,
           ]
           break;
         case (FailureMode.Node):
           failureResults = [
-            <p>You can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead === 1 ? "" : "s"}.</p>,
-            <p>You can lose {this.state.failedNodes} node{this.state.failedNodes === 1 ? "" : "s"}.</p>,
+            <p key="n1">With {this.state.replicationFactor}x replication you can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead === 1 ? "" : "s"}.</p>,
+            <p key="n2">You can lose {this.state.failedNodes} node{this.state.failedNodes === 1 ? "" : "s"}.</p>,
           ]
           break;
       }

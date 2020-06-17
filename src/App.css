@@ -113,3 +113,8 @@
     font-size: x-large;
     text-align: center;
 }
+
+.FailureResults {
+    font-size: x-large;
+    color: yellow;
+}
