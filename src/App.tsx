@@ -533,41 +533,6 @@ class MainForm extends React.Component<{}, MainFormState> {
       <Region {...r} />
     );
     let nodeCount = this.state.numberRegions * this.state.DCsPerRegion * this.state.AZsPerDC * this.state.NodesPerAZ;
-    let failureResults: Array<JSX.Element> = [];
-    if (this.state.failureMode > FailureMode.None) {
-      switch (this.state.failureMode) {
-        case (FailureMode.Region):
-          failureResults = [
-            <p key="r1">With {this.state.replicationFactor}x replication you can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead === 1 ? "" : "s"}.</p>,
-            <p key="r2">You can lose {this.state.failedRegions} region{this.state.failedRegions === 1 ? "" : "s"}.</p>,
-            <p key="r3">You can lose {this.state.failedDCs} additional data center{this.state.failedDCs === 1 ? "" : "s"}.</p>,
-            <p key="r4">You can lose {this.state.failedAZs} additional availability zone{this.state.failedAZs === 1 ? "" : "s"}.</p>,
-            <p key="r5">You can lose {this.state.failedNodes} additional node{this.state.failedNodes === 1 ? "" : "s"}.</p>,
-          ]
-          break;
-        case (FailureMode.DataCenter):
-          failureResults = [
-            <p key="d1">With {this.state.replicationFactor}x replication you can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead === 1 ? "" : "s"}.</p>,
-            <p key="d2">You can lose {this.state.failedDCs} data center{this.state.failedDCs === 1 ? "" : "s"}.</p>,
-            <p key="d3">You can lose {this.state.failedAZs} additional availability zone{this.state.failedAZs === 1 ? "" : "s"}.</p>,
-            <p key="d4">You can lose {this.state.failedNodes} additional node{this.state.failedNodes === 1 ? "" : "s"}.</p>,
-          ]
-          break;
-        case (FailureMode.AvailabilityZone):
-          failureResults = [
-            <p key="a1">With {this.state.replicationFactor}x replication you can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead === 1 ? "" : "s"}.</p>,
-            <p key="a2">You can lose {this.state.failedAZs} availability zone{this.state.failedAZs === 1 ? "" : "s"}.</p>,
-            <p key="a3">You can lose {this.state.failedNodes} additional node{this.state.failedNodes === 1 ? "" : "s"}.</p>,
-          ]
-          break;
-        case (FailureMode.Node):
-          failureResults = [
-            <p key="n1">With {this.state.replicationFactor}x replication you can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead === 1 ? "" : "s"}.</p>,
-            <p key="n2">You can lose {this.state.failedNodes} node{this.state.failedNodes === 1 ? "" : "s"}.</p>,
-          ]
-          break;
-      }
-    }
     return (
       <div>
         <div className="App-form">
@@ -584,21 +549,21 @@ class MainForm extends React.Component<{}, MainFormState> {
               </thead>
               <tbody>
                 <tr>
-                  <th>
+                  <td>
                     <input className="App-input" type="number" value={this.state.numberRegions} onChange={this.handleNumberRegionsChange} />
-                  </th>
-                  <th>
+                  </td>
+                  <td>
                     <input className="App-input" name="DCsPerRegion" type="number" value={this.state.DCsPerRegion} onChange={this.handleDCsPerRegionChange} />
-                  </th>
-                  <th>
+                  </td>
+                  <td>
                     <input className="App-input" name="AZsPerDC" type="number" value={this.state.AZsPerDC} onChange={this.handleAZsPerDCChange} />
-                  </th>
-                  <th>
+                  </td>
+                  <td>
                     <input className="App-input" name="NodesPerAZ" type="number" value={this.state.NodesPerAZ} onChange={this.handleNodesPerAZChange} />
-                  </th>
-                  <th>
+                  </td>
+                  <td>
                     <input className="App-input" name="replicationFactor" type="number" value={this.state.replicationFactor} onChange={this.handleReplicationFactorChange} />
-                  </th>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -615,16 +580,55 @@ class MainForm extends React.Component<{}, MainFormState> {
           </form>
         </div>
         {
-          nodeCount < this.state.replicationFactor ?
-            <div className="Underreplicated">
-              The system is underreplicated: There are {nodeCount} nodes, but {this.state.replicationFactor} are needed.
-          </div> : []
+          nodeCount < this.state.replicationFactor && <div className="Underreplicated">
+            The system is underreplicated: There are {nodeCount} nodes, but {this.state.replicationFactor} are needed.
+            </div>
         }
         {
-          this.state.failureMode === FailureMode.None ? [] :
-            <div className="FailureResults">
-              {failureResults}
+          this.state.failureMode !== FailureMode.None && <div className="FailureResults">
+            <div>With {this.state.replicationFactor}x replication you can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead !== 1 && "s"}.</div>
+            <div>This scenario will survive losing at most:</div>
+            <div className="FailureTable">
+              {!!this.state.failedRegions &&
+                <div className="FailureRow">
+                  <div className="FailureColumn">
+                    <div className="FailureHeader">Regions</div>
+                  </div>
+                  <div className="FailureColumn">
+                    <div className="FailureValue">{this.state.failedRegions}</div>
+                  </div>
+                </div>
+              }
+              {!!(this.state.failedRegions || this.state.failedDCs) &&
+                <div className="FailureRow">
+                  <div className="FailureColumn">
+                    <div className="FailureHeader">Data Centers</div>
+                  </div>
+                  <div className="FailureColumn">
+                    <div className="FailureValue">{this.state.failedDCs}</div>
+                  </div>
+                </div>
+              }
+              {!!(this.state.failedRegions || this.state.failedDCs || this.state.failedAZs) &&
+                <div className="FailureRow">
+                  <div className="FailureColumn">
+                    <div className="FailureHeader">Availability Zones</div>
+                  </div>
+                  <div className="FailureColumn">
+                    <div className="FailureValue">{this.state.failedAZs}</div>
+                  </div>
+                </div>
+              }
+              <div className="FailureRow">
+                <div className="FailureColumn">
+                  <div className="FailureHeader">Nodes</div>
+                </div>
+                <div className="FailureColumn">
+                  <div className="FailureValue">{this.state.failedNodes}</div>
+                </div>
+              </div>
             </div>
+          </div>
         }
         <div className="App-container">
           {regions}
