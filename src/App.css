@@ -117,4 +117,33 @@
 .FailureResults {
     font-size: x-large;
     color: yellow;
+    margin: 20px;
+}
+
+.FailureTable {
+    padding: 20px;
+}
+
+.FailureRow {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.FailureColumn {
+    display: flex;
+    flex-direction: column;
+    flex-basis: 100%;
+    flex: 1;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.FailureHeader {
+    text-align: right;
+}
+
+.FailureValue {
+    text-align: left;
 }
