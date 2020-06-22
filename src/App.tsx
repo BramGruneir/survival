@@ -512,6 +512,7 @@ class MainForm extends React.Component<{}, MainFormState> {
       }
     }
 
+    // Add all the keys.
     state.regions.forEach(r => {
       r.key = generateKey(r);
       r.datacenters.forEach(dc => {
