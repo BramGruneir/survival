@@ -1,68 +1,66 @@
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+# Survival
 
-## Available Scripts
+This tool simulates survivable failures in different homogeneous network topologies in a
+CockroachDB cluster.
 
-In the project directory, you can run:
+This is done by simulating a single range and placing its replicas following the default diversity
+rules of Cockroach for maximum survivability. It then finds  the maximum number of failures that
+the cluster can suffer without experiencing any unavailability.
 
-### `yarn start`
+There are 4 levels, _Regions_, _Data Centers_, _Availability Zones_ and _Nodes_. But these are just
+placeholder names.  They just represent the topology of the network and can fit whatever topology
+you have.  If you want to ignore one level, just set it to 1.
 
-Runs the app in the development mode.<br />
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+You can select whichever failure mode you're interested in.  Note that each failure mode occurs at a
+different level.  _Region_ failures show how many regions can fail, plus an extra lower level of
+failures.  But it cannot be combined with _Availability Zones_ failures. i.e.:
 
-The page will reload if you make edits.<br />
-You will also see any lint errors in the console.
+If you have a 3 Region, 2 DC per Region, 3 AZ per DC and 3 Nodes per AZ setup with a replication
+factor of 9x, you can survive the following scenarios:
 
-### `yarn test`
+- 1 Region and 1 additional AZ
+- 1 DC and 1 additional AZ
+- 4 Availability Zones
+- 4 Nodes
 
-Launches the test runner in the interactive watch mode.<br />
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+But note that these are different scenarios and cannot overlap.
 
-### `yarn build`
+## Limitations
 
-Builds the app for production to the `build` folder.<br />
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Non-Homogeneous Clusters
 
-The build is minified and the filenames include the hashes.<br />
-Your app is ready to be deployed!
+This tool doesn't handle non-homogeneous clusters.  If you are trying to look at the
+survivability of clusters that have a different number of DCs per region, or AZs per DC or nodes
+per AZ, then just pick the smallest number of the options.  This should approximate the
+failures.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Constraints
 
-### `yarn eject`
+If there are Required or Prohibited constraints (see
+[here](https://www.cockroachlabs.com/docs/v20.1/configure-replication-zones.html#types-of-constraints))
+on the cluster, you must treat each constraint zone differently as they will have different failure
+modes.  Just setup the cluster as if the constraint is being followed.  (i.e. remove any prohibited
+DC or only include required ones)
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+Per replica constraints cannot yet be handled by this tool, but it should provide a good starting
+point.
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Instructions
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+### Requirements
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+- Node v14.4.0 (or later)
+- NPM v6.14.5 (or later)
+- yarn v1.22.4 (or later)
 
-## Learn More
+### To Run
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+1. clone the repo
+1. install all dependencies: `yarn`
+1. start the server `yarn start`
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Bugs, improvements, etc
 
-### Code Splitting
+Please feel free to issue PRs and/or issues for bugs.
 
-This section has moved here: https://facebook.github.io/create-react-app/docs/code-splitting
-
-### Analyzing the Bundle Size
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size
-
-### Making a Progressive Web App
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app
-
-### Advanced Configuration
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/advanced-configuration
-
-### Deployment
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/deployment
-
-### `yarn build` fails to minify
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify
+___All help is appreciated!___
