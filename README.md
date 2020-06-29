@@ -56,7 +56,8 @@ point.
 ### To Run
 
 1. clone the repo
-1. install all dependencies: `yarn`
+1. install all dependencies: `yarn` `node` `npm` (on MacOS, `brew install node`, `brew install npm`, `brew install yarn`)
+1. use `npm install` to download and configure the react packages
 1. start the server `yarn start`
 
 ## Bugs, improvements, etc
