@@ -1,5 +1,6 @@
 import React from 'react';
 import './App.css';
+import qs from "query-string";
 
 interface NodeProps {
   key: string;
@@ -15,12 +16,12 @@ function generateKey(props: NodeProps): string {
 
 function pickBoxClass(node: NodeProps): string {
   if (node.failed) {
-    return "Box-failed"
+    return "Box-failed";
   }
   if (node.replicas === 0) {
-    return "Box-empty"
+    return "Box-empty";
   }
-  return "Box"
+  return "Box";
 }
 
 class Node extends React.Component<NodeProps, {}> {
@@ -109,22 +110,6 @@ enum FailureMode {
   Node,
 }
 
-interface MainFormState {
-  numberRegions: number;
-  DCsPerRegion: number;
-  AZsPerDC: number;
-  NodesPerAZ: number;
-  replicationFactor: number;
-  failureMode: FailureMode;
-  failedRegions: number;
-  failedDCs: number;
-  failedAZs: number;
-  failedNodes: number;
-  deadReplicas: number;
-  allowableDead: number;
-  regions: Array<RegionProps>;
-}
-
 function limit(num: number, min: number, max: number): number {
   if (num < min) {
     return min;
@@ -135,16 +120,89 @@ function limit(num: number, min: number, max: number): number {
   return num;
 }
 
+interface UserState {
+  numberRegions: number;
+  DCsPerRegion: number;
+  AZsPerDC: number;
+  NodesPerAZ: number;
+  replicationFactor: number;
+  failureMode: FailureMode;
+}
+
+const defaultUserState: UserState = {
+  numberRegions: 1,
+  DCsPerRegion: 3,
+  AZsPerDC: 3,
+  NodesPerAZ: 3,
+  replicationFactor: 3,
+  failureMode: FailureMode.Region,
+}
+
+function populateSearch(state: UserState) {
+  let newSearch = qs.stringify(state);
+  let parsedURL = qs.parseUrl(window.location.href);
+  let oldSearch = qs.stringify(parsedURL.query);
+  if (newSearch === oldSearch) {
+    return
+  }
+  let newURL = parsedURL.url + '?' + newSearch;
+  window.history.pushState(state, "CockroachDB Survival Tool", newURL);
+}
+
+function fixUserState(state: UserState): UserState {
+  state.numberRegions = limit(state.numberRegions, 1, 10);
+  state.DCsPerRegion = limit(state.DCsPerRegion, 1, 10);
+  state.AZsPerDC = limit(state.AZsPerDC, 1, 10);
+  state.NodesPerAZ = limit(state.NodesPerAZ, 1, 100);
+  if (state.replicationFactor % 2 === 0) {
+    state.replicationFactor--;
+  }
+  state.replicationFactor = limit(state.replicationFactor, 1, 99);
+  return state;
+}
+
+function fetchState(): UserState {
+  let userState = defaultUserState;
+  Object.entries(qs.parse(window.location.search)).forEach(
+    ([key, value]) => {
+      switch (key) {
+        case "numberRegions": userState.numberRegions = parseInt(value + "") || defaultUserState.numberRegions; break;
+        case "DCsPerRegion": userState.DCsPerRegion = parseInt(value + "") || defaultUserState.DCsPerRegion; break;
+        case "AZsPerDC": userState.AZsPerDC = parseInt(value + "") || defaultUserState.AZsPerDC; break;
+        case "NodesPerAZ": userState.NodesPerAZ = parseInt(value + "") || defaultUserState.NodesPerAZ; break;
+        case "replicationFactor": userState.replicationFactor = parseInt(value + "") || defaultUserState.replicationFactor; break;
+        case "failureMode": userState.failureMode = parseInt(value + "") || defaultUserState.failureMode; break;
+      }
+    }
+  )
+  userState = fixUserState(userState);
+  return userState;
+}
+
+interface MainFormState {
+  userState: UserState;
+  failedRegions: number;
+  failedDCs: number;
+  failedAZs: number;
+  failedNodes: number;
+  deadReplicas: number;
+  allowableDead: number;
+  regions: Array<RegionProps>;
+}
+
 class MainForm extends React.Component<{}, MainFormState> {
   constructor(props: any) {
     super(props);
+
+    let userState = defaultUserState;
+    if (window.location.search.length === 0) {
+      populateSearch(userState);
+    } else {
+      userState = fetchState();
+    }
+
     this.state = {
-      numberRegions: 3,
-      DCsPerRegion: 3,
-      AZsPerDC: 3,
-      NodesPerAZ: 3,
-      replicationFactor: 3,
-      failureMode: FailureMode.Region,
+      userState: userState,
       failedRegions: 0,
       failedDCs: 0,
       failedAZs: 0,
@@ -163,18 +221,22 @@ class MainForm extends React.Component<{}, MainFormState> {
   }
 
   componentDidMount() {
+    window.addEventListener("popstate", e => {
+      this.handlePopState();
+    });
     let curState = this.getCurrentState();
-    this.setState(this.update(curState))
+    this.setState(this.update(curState));
+  }
+
+  handlePopState() {
+    let curState = this.getCurrentState();
+    curState.userState = curState.userState = fetchState();
+    this.setState(this.update(curState));
   }
 
   getCurrentState(): MainFormState {
     return {
-      numberRegions: this.state.numberRegions,
-      DCsPerRegion: this.state.DCsPerRegion,
-      AZsPerDC: this.state.AZsPerDC,
-      NodesPerAZ: this.state.NodesPerAZ,
-      replicationFactor: this.state.replicationFactor,
-      failureMode: this.state.failureMode,
+      userState: this.state.userState,
       failedRegions: this.state.failedRegions,
       failedDCs: this.state.failedDCs,
       failedAZs: this.state.failedAZs,
@@ -186,60 +248,59 @@ class MainForm extends React.Component<{}, MainFormState> {
   }
 
   handleNumberRegionsChange(event: any) {
-    let value = parseInt(event.target.value) || 1;
-    value = limit(value, 1, 10);
+    let value = parseInt(event.target.value) || defaultUserState.numberRegions;
     let curState = this.getCurrentState();
-    curState.numberRegions = value;
-    this.setState(this.update(curState))
+    curState.userState.numberRegions = value;
+    this.setState(this.update(curState));
   }
   handleDCsPerRegionChange(event: any) {
-    let value = parseInt(event.target.value) || 1;
-    value = limit(value, 1, 10);
+    let value = parseInt(event.target.value) || defaultUserState.DCsPerRegion;
     let curState = this.getCurrentState();
-    curState.DCsPerRegion = value;
-    this.setState(this.update(curState))
+    curState.userState.DCsPerRegion = value;
+    this.setState(this.update(curState));
   }
   handleAZsPerDCChange(event: any) {
-    let value = parseInt(event.target.value) || 1;
-    value = limit(value, 1, 10);
+    let value = parseInt(event.target.value) || defaultUserState.AZsPerDC;
     let curState = this.getCurrentState();
-    curState.AZsPerDC = value;
-    this.setState(this.update(curState))
+    curState.userState.AZsPerDC = value;
+    this.setState(this.update(curState));
   }
   handleNodesPerAZChange(event: any) {
-    let value = parseInt(event.target.value) || 1;
-    value = limit(value, 1, 100);
+    let value = parseInt(event.target.value) || defaultUserState.NodesPerAZ;
     let curState = this.getCurrentState();
-    curState.NodesPerAZ = value;
-    this.setState(this.update(curState))
+    curState.userState.NodesPerAZ = value;
+    this.setState(this.update(curState));
   }
   handleReplicationFactorChange(event: any) {
-    let value = parseInt(event.target.value) || 1;
+    let value = parseInt(event.target.value) || defaultUserState.replicationFactor;
     if (value % 2 === 0) {
-      if (this.state.replicationFactor > value) {
+      if (this.state.userState.replicationFactor > value) {
         value--;
       } else {
         value++;
       }
     }
-    value = limit(value, 1, 99);
     let curState = this.getCurrentState();
-    curState.replicationFactor = value;
-    this.setState(this.update(curState), this.forceUpdate)
+    curState.userState.replicationFactor = value;
+    this.setState(this.update(curState), this.forceUpdate);
   }
   handleFailureModeChange(event: any) {
     let curState = this.getCurrentState();
-    curState.failureMode = parseInt(event.target.value) || FailureMode.None;
-    this.setState(this.update(curState))
+    curState.userState.failureMode = parseInt(event.target.value) || FailureMode.None;
+    this.setState(this.update(curState));
   }
 
   update(state: MainFormState): MainFormState {
+    // Update the search params.
+    state.userState = fixUserState(state.userState);
+    populateSearch(state.userState);
+
     // Spec out the whole system.
-    state.allowableDead = Math.floor(state.replicationFactor / 2);
+    state.allowableDead = Math.floor(state.userState.replicationFactor / 2);
 
     // Regions
     state.regions = [];
-    for (let r = 0; r < state.numberRegions; r++) {
+    for (let r = 0; r < state.userState.numberRegions; r++) {
       let regionProps: RegionProps = {
         key: "",
         id: r + 1,
@@ -249,7 +310,7 @@ class MainForm extends React.Component<{}, MainFormState> {
       }
 
       // Data Centers
-      for (let d = 0; d < state.DCsPerRegion; d++) {
+      for (let d = 0; d < state.userState.DCsPerRegion; d++) {
         let dataCenterProps: DataCenterProps = {
           key: "",
           id: d + 1,
@@ -259,7 +320,7 @@ class MainForm extends React.Component<{}, MainFormState> {
         }
 
         // Availability Zones
-        for (let a = 0; a < state.AZsPerDC; a++) {
+        for (let a = 0; a < state.userState.AZsPerDC; a++) {
           let availabilityZoneProps: AvailabilityZoneProps = {
             key: "",
             id: a + 1,
@@ -269,7 +330,7 @@ class MainForm extends React.Component<{}, MainFormState> {
           }
 
           // Nodes
-          for (let a = 0; a < state.NodesPerAZ; a++) {
+          for (let a = 0; a < state.userState.NodesPerAZ; a++) {
             let nodeProps: NodeProps = {
               key: "",
               id: a + 1,
@@ -287,14 +348,14 @@ class MainForm extends React.Component<{}, MainFormState> {
 
     // Add the example range.  This is not fun, there must be a better way.
     // Replicas per region
-    for (let i = 0; i < state.replicationFactor; i++) {
-      let region = i % state.numberRegions;
+    for (let i = 0; i < state.userState.replicationFactor; i++) {
+      let region = i % state.userState.numberRegions;
       state.regions[region].replicas++;
     }
     // Replicas per DC
     state.regions.forEach(r => {
       for (let i = 0; i < r.replicas; i++) {
-        let dc = i % state.DCsPerRegion;
+        let dc = i % state.userState.DCsPerRegion;
         r.datacenters[dc].replicas++;
       }
     });
@@ -302,7 +363,7 @@ class MainForm extends React.Component<{}, MainFormState> {
     state.regions.forEach(r =>
       r.datacenters.forEach(dc => {
         for (let i = 0; i < dc.replicas; i++) {
-          let az = i % state.AZsPerDC;
+          let az = i % state.userState.AZsPerDC;
           dc.availabilityZones[az].replicas++;
         }
       })
@@ -313,7 +374,7 @@ class MainForm extends React.Component<{}, MainFormState> {
         dc.availabilityZones.forEach(az => {
           // This is technically not needed, can't put more than one replica on a node.
           for (let i = 0; i < az.replicas; i++) {
-            let n = i % state.NodesPerAZ;
+            let n = i % state.userState.NodesPerAZ;
             az.nodes[n].replicas++;
           }
         })
@@ -328,8 +389,8 @@ class MainForm extends React.Component<{}, MainFormState> {
     state.failedNodes = 0;
 
     // Regions
-    if (state.failureMode === FailureMode.Region) {
-      for (let i = 0; i < state.numberRegions; i++) {
+    if (state.userState.failureMode === FailureMode.Region) {
+      for (let i = 0; i < state.userState.numberRegions; i++) {
         if (state.regions[i].replicas === 0) {
           // An empty region means that the range never wrapped and we know the
           // rest of Regions or DCs will be empty.
@@ -349,25 +410,25 @@ class MainForm extends React.Component<{}, MainFormState> {
     }
 
     // DCs
-    if (state.failureMode > FailureMode.None &&
-      state.failureMode <= FailureMode.DataCenter &&
+    if (state.userState.failureMode > FailureMode.None &&
+      state.userState.failureMode <= FailureMode.DataCenter &&
       state.deadReplicas < state.allowableDead) {
       // Traverse the first DC in each region, then the second DC in each region ...
       let i = -1;
       let j = 0;
       while (state.deadReplicas < state.allowableDead) {
         i++;
-        if (i >= state.numberRegions) {
+        if (i >= state.userState.numberRegions) {
           i = 0;
           j++;
-          if (j >= state.DCsPerRegion) {
+          if (j >= state.userState.DCsPerRegion) {
             // We are at the end.
             break;
           }
         }
         if (state.regions[i].failed) {
           // Skip all failed regions.
-          continue
+          continue;
         }
         if ((state.regions[i].replicas === 0) ||
           (state.regions[i].datacenters[j].replicas === 0)) {
@@ -389,8 +450,8 @@ class MainForm extends React.Component<{}, MainFormState> {
     }
 
     // AZs
-    if (state.failureMode > FailureMode.None &&
-      state.failureMode <= FailureMode.AvailabilityZone &&
+    if (state.userState.failureMode > FailureMode.None &&
+      state.userState.failureMode <= FailureMode.AvailabilityZone &&
       state.deadReplicas < state.allowableDead) {
       // Traversal order for a 3x3x3: (Region-DC-AZ)
       // 1-1-1, 2-1-1, 3-1-1,
@@ -407,13 +468,13 @@ class MainForm extends React.Component<{}, MainFormState> {
       let k = 0;
       while (state.deadReplicas < state.allowableDead) {
         i++;
-        if (i >= state.numberRegions) {
+        if (i >= state.userState.numberRegions) {
           i = 0;
           j++;
-          if (j >= state.DCsPerRegion) {
+          if (j >= state.userState.DCsPerRegion) {
             j = 0;
             k++;
-            if (k >= state.AZsPerDC) {
+            if (k >= state.userState.AZsPerDC) {
               // We are at the end.
               break;
             }
@@ -446,8 +507,8 @@ class MainForm extends React.Component<{}, MainFormState> {
     }
 
     // Nodes
-    if (state.failureMode > FailureMode.None &&
-      state.failureMode <= FailureMode.Node &&
+    if (state.userState.failureMode > FailureMode.None &&
+      state.userState.failureMode <= FailureMode.Node &&
       state.deadReplicas < state.allowableDead) {
       // Traversal order for a 2x2x2x2: (Region-DC-AZ-Nodes)
       // 1-1-1-1, 2-1-1-1,
@@ -465,16 +526,16 @@ class MainForm extends React.Component<{}, MainFormState> {
       let l = 0;
       while (state.deadReplicas < state.allowableDead) {
         i++;
-        if (i >= state.numberRegions) {
+        if (i >= state.userState.numberRegions) {
           i = 0;
           j++;
-          if (j >= state.DCsPerRegion) {
+          if (j >= state.userState.DCsPerRegion) {
             j = 0;
             k++;
-            if (k >= state.AZsPerDC) {
+            if (k >= state.userState.AZsPerDC) {
               k = 0;
               l++;
-              if (l >= state.NodesPerAZ) {
+              if (l >= state.userState.NodesPerAZ) {
                 // We are at the end.
                 break;
               }
@@ -533,7 +594,10 @@ class MainForm extends React.Component<{}, MainFormState> {
     let regions = this.state.regions.map((r) =>
       <Region {...r} />
     );
-    let nodeCount = this.state.numberRegions * this.state.DCsPerRegion * this.state.AZsPerDC * this.state.NodesPerAZ;
+    let nodeCount = this.state.userState.numberRegions *
+      this.state.userState.DCsPerRegion *
+      this.state.userState.AZsPerDC *
+      this.state.userState.NodesPerAZ;
     return (
       <div>
         <div className="App-form">
@@ -551,26 +615,26 @@ class MainForm extends React.Component<{}, MainFormState> {
               <tbody>
                 <tr>
                   <td>
-                    <input className="App-input" type="number" value={this.state.numberRegions} onChange={this.handleNumberRegionsChange} />
+                    <input className="App-input" type="number" value={this.state.userState.numberRegions} onChange={this.handleNumberRegionsChange} />
                   </td>
                   <td>
-                    <input className="App-input" name="DCsPerRegion" type="number" value={this.state.DCsPerRegion} onChange={this.handleDCsPerRegionChange} />
+                    <input className="App-input" name="DCsPerRegion" type="number" value={this.state.userState.DCsPerRegion} onChange={this.handleDCsPerRegionChange} />
                   </td>
                   <td>
-                    <input className="App-input" name="AZsPerDC" type="number" value={this.state.AZsPerDC} onChange={this.handleAZsPerDCChange} />
+                    <input className="App-input" name="AZsPerDC" type="number" value={this.state.userState.AZsPerDC} onChange={this.handleAZsPerDCChange} />
                   </td>
                   <td>
-                    <input className="App-input" name="NodesPerAZ" type="number" value={this.state.NodesPerAZ} onChange={this.handleNodesPerAZChange} />
+                    <input className="App-input" name="NodesPerAZ" type="number" value={this.state.userState.NodesPerAZ} onChange={this.handleNodesPerAZChange} />
                   </td>
                   <td>
-                    <input className="App-input" name="replicationFactor" type="number" value={this.state.replicationFactor} onChange={this.handleReplicationFactorChange} />
+                    <input className="App-input" name="replicationFactor" type="number" value={this.state.userState.replicationFactor} onChange={this.handleReplicationFactorChange} />
                   </td>
                 </tr>
               </tbody>
             </table>
             <div className="FailureMode">
               <div>Failure Mode:</div>
-              <select className="FailureSelect" value={this.state.failureMode} onChange={this.handleFailureModeChange}>
+              <select className="FailureSelect" value={this.state.userState.failureMode} onChange={this.handleFailureModeChange}>
                 <option value={FailureMode.None}>None</option>
                 <option value={FailureMode.Region}>Region</option>
                 <option value={FailureMode.DataCenter}>DataCenter</option>
@@ -581,13 +645,13 @@ class MainForm extends React.Component<{}, MainFormState> {
           </form>
         </div>
         {
-          nodeCount < this.state.replicationFactor && <div className="Underreplicated">
-            The system is underreplicated: There are {nodeCount} nodes, but {this.state.replicationFactor} are needed.
+          nodeCount < this.state.userState.replicationFactor && <div className="Underreplicated">
+            The system is underreplicated: There are {nodeCount} nodes, but {this.state.userState.replicationFactor} are needed.
             </div>
         }
         {
-          this.state.failureMode !== FailureMode.None && <div className="FailureResults">
-            <div>With {this.state.replicationFactor}x replication you can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead !== 1 && "s"}.</div>
+          this.state.userState.failureMode !== FailureMode.None && <div className="FailureResults">
+            <div>With {this.state.userState.replicationFactor}x replication you can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead !== 1 && "s"}.</div>
             <div>This scenario will survive losing at most:</div>
             <div className="FailureTable">
               {!!this.state.failedRegions &&
