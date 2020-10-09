@@ -194,10 +194,7 @@ function fetchState(): UserState {
 
 interface MainFormState {
   userState: UserState;
-  failedRegions: number;
-  failedDCs: number;
-  failedAZs: number;
-  failedNodes: number;
+  failures: Array<number>;
   deadReplicas: number;
   allowableDead: number;
   regions: Array<RegionProps>;
@@ -216,10 +213,7 @@ class MainForm extends React.Component<{}, MainFormState> {
 
     this.state = {
       userState: userState,
-      failedRegions: 0,
-      failedDCs: 0,
-      failedAZs: 0,
-      failedNodes: 0,
+      failures: [0,0,0,0],
       deadReplicas: 0,
       allowableDead: 0,
       regions: [],
@@ -247,10 +241,7 @@ class MainForm extends React.Component<{}, MainFormState> {
   getCurrentState(): MainFormState {
     return {
       userState: this.state.userState,
-      failedRegions: this.state.failedRegions,
-      failedDCs: this.state.failedDCs,
-      failedAZs: this.state.failedAZs,
-      failedNodes: this.state.failedNodes,
+      failures: this.state.failures,
       deadReplicas: this.state.deadReplicas,
       allowableDead: this.state.allowableDead,
       regions: [],
@@ -378,11 +369,8 @@ class MainForm extends React.Component<{}, MainFormState> {
     );
 
     // Check for failures.
+    state.failures = [0,0,0,0];
     state.deadReplicas = 0;
-    state.failedRegions = 0;
-    state.failedDCs = 0;
-    state.failedAZs = 0;
-    state.failedNodes = 0;
 
     // Regions
     if (state.userState.failureMode === 1) {
@@ -395,7 +383,7 @@ class MainForm extends React.Component<{}, MainFormState> {
         if (state.deadReplicas + state.regions[i].replicas <= state.allowableDead) {
           state.regions[i].failed = true;
           state.deadReplicas += state.regions[i].replicas;
-          state.failedRegions++;
+          state.failures[0]++;
         } else {
           // Don't continue here as these are traversed in order. This ensures
           // we don't kill a region with less replicas. We want worst case
@@ -435,7 +423,7 @@ class MainForm extends React.Component<{}, MainFormState> {
         if (state.deadReplicas + state.regions[i].datacenters[j].replicas <= state.allowableDead) {
           state.regions[i].datacenters[j].failed = true;
           state.deadReplicas += state.regions[i].datacenters[j].replicas;
-          state.failedDCs++;
+          state.failures[1]++;
         } else {
           // Don't continue here as these are traversed in order. This ensures
           // we don't kill a DC with less replicas. We want worst case scenario
@@ -492,7 +480,7 @@ class MainForm extends React.Component<{}, MainFormState> {
         if (state.deadReplicas + state.regions[i].datacenters[j].availabilityZones[k].replicas <= state.allowableDead) {
           state.regions[i].datacenters[j].availabilityZones[k].failed = true;
           state.deadReplicas += state.regions[i].datacenters[j].availabilityZones[k].replicas;
-          state.failedAZs++;
+          state.failures[2]++;
         } else {
           // Don't continue here as these are traversed in order. This ensures
           // we don't kill a AZ with less replicas. We want worst case scenario
@@ -557,7 +545,7 @@ class MainForm extends React.Component<{}, MainFormState> {
         if (state.deadReplicas + state.regions[i].datacenters[j].availabilityZones[k].nodes[l].replicas <= state.allowableDead) {
           state.regions[i].datacenters[j].availabilityZones[k].nodes[l].failed = true;
           state.deadReplicas += state.regions[i].datacenters[j].availabilityZones[k].nodes[l].replicas;
-          state.failedNodes++;
+          state.failures[3]++;
         } else {
           // Don't continue here as these are traversed in order. This ensures
           // we don't kill a node with less replicas. We want worst case
@@ -590,10 +578,7 @@ class MainForm extends React.Component<{}, MainFormState> {
     let regions = this.state.regions.map((r) =>
       <Region {...r} />
     );
-    let nodeCount = this.state.userState.counts[0] *
-      this.state.userState.counts[1] *
-      this.state.userState.counts[2] *
-      this.state.userState.counts[3];
+    let nodeCount = this.state.userState.counts.reduce((a,b) => a + b, 0);
     return (
       <div>
         <div className="App-form">
@@ -652,33 +637,33 @@ class MainForm extends React.Component<{}, MainFormState> {
             <div>With {this.state.userState.replicationFactor}x replication you can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead !== 1 && "s"}.</div>
             <div>This scenario will survive losing at most:</div>
             <div className="FailureTable">
-              {!!this.state.failedRegions &&
+              {!!this.state.failures[0] &&
                 <div className="FailureRow">
                   <div className="FailureColumn">
                     <div className="FailureHeader">{pluralize.plural(this.state.userState.names[0])}</div>
                   </div>
                   <div className="FailureColumn">
-                    <div className="FailureValue">{this.state.failedRegions}</div>
+                    <div className="FailureValue">{this.state.failures[0]}</div>
                   </div>
                 </div>
               }
-              {!!(this.state.failedRegions || this.state.failedDCs) &&
+              {!!(this.state.failures[0] || this.state.failures[1]) &&
                 <div className="FailureRow">
                   <div className="FailureColumn">
                     <div className="FailureHeader">{pluralize.plural(this.state.userState.names[1])}</div>
                   </div>
                   <div className="FailureColumn">
-                    <div className="FailureValue">{this.state.failedDCs}</div>
+                    <div className="FailureValue">{this.state.failures[1]}</div>
                   </div>
                 </div>
               }
-              {!!(this.state.failedRegions || this.state.failedDCs || this.state.failedAZs) &&
+              {!!(this.state.failures[0] || this.state.failures[1] || this.state.failures[2]) &&
                 <div className="FailureRow">
                   <div className="FailureColumn">
                     <div className="FailureHeader">{pluralize.plural(this.state.userState.names[2])}</div>
                   </div>
                   <div className="FailureColumn">
-                    <div className="FailureValue">{this.state.failedAZs}</div>
+                    <div className="FailureValue">{this.state.failures[2]}</div>
                   </div>
                 </div>
               }
@@ -687,7 +672,7 @@ class MainForm extends React.Component<{}, MainFormState> {
                   <div className="FailureHeader">{pluralize.plural(this.state.userState.names[3])}</div>
                 </div>
                 <div className="FailureColumn">
-                  <div className="FailureValue">{this.state.failedNodes}</div>
+                  <div className="FailureValue">{this.state.failures[3]}</div>
                 </div>
               </div>
             </div>
