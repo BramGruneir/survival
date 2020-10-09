@@ -156,7 +156,6 @@ function fetchState(): UserState {
   let userState = defaultUserState;
   Object.entries(qs.parse(window.location.search, {arrayFormat: 'comma'})).forEach(
     ([key, value]) => {
-      debugger
       switch (key) {
         case "counts":
           if (value == null || !Array.isArray(value)) {
@@ -598,11 +597,10 @@ class MainForm extends React.Component<{}, MainFormState> {
                 <tr>
                   {
                     this.state.userState.names.map((name, i) =>
-                      <td>
+                      <td key={"input" + name}>
                         <input className="App-input"
                           type="number"
                           name={name}
-                          key={i}
                           value={this.state.userState.counts[i]}
                           onChange={(e) => this.handleCountChange(i, e)} />
                       </td>
@@ -637,44 +635,21 @@ class MainForm extends React.Component<{}, MainFormState> {
             <div>With {this.state.userState.replicationFactor}x replication you can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead !== 1 && "s"}.</div>
             <div>This scenario will survive losing at most:</div>
             <div className="FailureTable">
-              {!!this.state.failures[0] &&
-                <div className="FailureRow">
-                  <div className="FailureColumn">
-                    <div className="FailureHeader">{pluralize.plural(this.state.userState.names[0])}</div>
-                  </div>
-                  <div className="FailureColumn">
-                    <div className="FailureValue">{this.state.failures[0]}</div>
-                  </div>
-                </div>
+              {
+                this.state.failures.map((v,i) => {
+                  if ((i === this.state.failures.length-1) || (this.state.failures.slice(0,i+1).some(v => v > 0))) {
+                    return <div className="FailureRow" key={i}>
+                      <div className="FailureColumn">
+                        <div className="FailureHeader">{pluralize.plural(this.state.userState.names[i])}</div>
+                      </div>
+                      <div className="FailureColumn">
+                        <div className="FailureValue">{this.state.failures[i]}</div>
+                      </div>
+                    </div>
+                  }
+                  return false;
+                })
               }
-              {!!(this.state.failures[0] || this.state.failures[1]) &&
-                <div className="FailureRow">
-                  <div className="FailureColumn">
-                    <div className="FailureHeader">{pluralize.plural(this.state.userState.names[1])}</div>
-                  </div>
-                  <div className="FailureColumn">
-                    <div className="FailureValue">{this.state.failures[1]}</div>
-                  </div>
-                </div>
-              }
-              {!!(this.state.failures[0] || this.state.failures[1] || this.state.failures[2]) &&
-                <div className="FailureRow">
-                  <div className="FailureColumn">
-                    <div className="FailureHeader">{pluralize.plural(this.state.userState.names[2])}</div>
-                  </div>
-                  <div className="FailureColumn">
-                    <div className="FailureValue">{this.state.failures[2]}</div>
-                  </div>
-                </div>
-              }
-              <div className="FailureRow">
-                <div className="FailureColumn">
-                  <div className="FailureHeader">{pluralize.plural(this.state.userState.names[3])}</div>
-                </div>
-                <div className="FailureColumn">
-                  <div className="FailureValue">{this.state.failures[3]}</div>
-                </div>
-              </div>
             </div>
           </div>
         }
