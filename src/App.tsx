@@ -633,10 +633,11 @@ class MainForm extends React.Component<{}, MainFormState> {
               <div>Failure Mode:</div>
               <select className="FailureSelect" value={this.state.userState.failureMode} onChange={this.handleFailureModeChange}>
                 <option value={0}>None</option>
-                <option value={1}>{pluralize.singular(this.state.userState.names[0])}</option>
-                <option value={2}>{pluralize.singular(this.state.userState.names[1])}</option>
-                <option value={3}>{pluralize.singular(this.state.userState.names[2])}</option>
-                <option value={4}>{pluralize.singular(this.state.userState.names[3])}</option>
+                {
+                  this.state.userState.names.map((n,i) =>
+                    <option value={i+1} key={n}>{pluralize.singular(n)}</option>
+                  )
+                }
               </select>
             </div>
           </form>
