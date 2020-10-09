@@ -104,14 +104,6 @@ class Region extends React.Component<RegionProps, {}> {
   }
 }
 
-enum FailureMode {
-  None,
-  Region,
-  DataCenter,
-  AvailabilityZone,
-  Node,
-}
-
 function limit(num: number, min: number, max: number): number {
   if (num < min) {
     return min;
@@ -126,14 +118,14 @@ type UserState = {
   names: Array<string>;
   counts: Array<number>;
   replicationFactor: number;
-  failureMode: FailureMode;
+  failureMode: number;
 }
 
 const defaultUserState: UserState = {
   names: ["Regions","Data Centers","Availability Zones", "Nodes"],
   counts: [1,3,3,3],
   replicationFactor: 3,
-  failureMode: FailureMode.Region,
+  failureMode: 1,
 }
 
 function populateSearch(state: UserState) {
@@ -156,6 +148,7 @@ function fixUserState(state: UserState): UserState {
     state.replicationFactor--;
   }
   state.replicationFactor = limit(state.replicationFactor, 1, 99);
+  state.failureMode = limit(state.failureMode, 0, 4);
   return state;
 }
 
@@ -285,7 +278,7 @@ class MainForm extends React.Component<{}, MainFormState> {
   }
   handleFailureModeChange(event: any) {
     let curState = this.getCurrentState();
-    curState.userState.failureMode = parseInt(event.target.value) || FailureMode.None;
+    curState.userState.failureMode = parseInt(event.target.value) || 0;
     this.setState(this.update(curState));
   }
 
@@ -392,7 +385,7 @@ class MainForm extends React.Component<{}, MainFormState> {
     state.failedNodes = 0;
 
     // Regions
-    if (state.userState.failureMode === FailureMode.Region) {
+    if (state.userState.failureMode === 1) {
       for (let i = 0; i < state.userState.counts[0]; i++) {
         if (state.regions[i].replicas === 0) {
           // An empty region means that the range never wrapped and we know the
@@ -413,8 +406,8 @@ class MainForm extends React.Component<{}, MainFormState> {
     }
 
     // DCs
-    if (state.userState.failureMode > FailureMode.None &&
-      state.userState.failureMode <= FailureMode.DataCenter &&
+    if (state.userState.failureMode > 0 &&
+      state.userState.failureMode <= 2 &&
       state.deadReplicas < state.allowableDead) {
       // Traverse the first DC in each region, then the second DC in each region ...
       let i = -1;
@@ -453,8 +446,8 @@ class MainForm extends React.Component<{}, MainFormState> {
     }
 
     // AZs
-    if (state.userState.failureMode > FailureMode.None &&
-      state.userState.failureMode <= FailureMode.AvailabilityZone &&
+    if (state.userState.failureMode > 0 &&
+      state.userState.failureMode <= 3 &&
       state.deadReplicas < state.allowableDead) {
       // Traversal order for a 3x3x3: (Region-DC-AZ)
       // 1-1-1, 2-1-1, 3-1-1,
@@ -510,8 +503,8 @@ class MainForm extends React.Component<{}, MainFormState> {
     }
 
     // Nodes
-    if (state.userState.failureMode > FailureMode.None &&
-      state.userState.failureMode <= FailureMode.Node &&
+    if (state.userState.failureMode > 0 &&
+      state.userState.failureMode <= 4 &&
       state.deadReplicas < state.allowableDead) {
       // Traversal order for a 2x2x2x2: (Region-DC-AZ-Nodes)
       // 1-1-1-1, 2-1-1-1,
@@ -639,11 +632,11 @@ class MainForm extends React.Component<{}, MainFormState> {
             <div className="FailureMode">
               <div>Failure Mode:</div>
               <select className="FailureSelect" value={this.state.userState.failureMode} onChange={this.handleFailureModeChange}>
-                <option value={FailureMode.None}>None</option>
-                <option value={FailureMode.Region}>{pluralize.singular(this.state.userState.names[0])}</option>
-                <option value={FailureMode.DataCenter}>{pluralize.singular(this.state.userState.names[1])}</option>
-                <option value={FailureMode.AvailabilityZone}>{pluralize.singular(this.state.userState.names[2])}</option>
-                <option value={FailureMode.Node}>{pluralize.singular(this.state.userState.names[3])}</option>
+                <option value={0}>None</option>
+                <option value={1}>{pluralize.singular(this.state.userState.names[0])}</option>
+                <option value={2}>{pluralize.singular(this.state.userState.names[1])}</option>
+                <option value={3}>{pluralize.singular(this.state.userState.names[2])}</option>
+                <option value={4}>{pluralize.singular(this.state.userState.names[3])}</option>
               </select>
             </div>
           </form>
@@ -654,7 +647,7 @@ class MainForm extends React.Component<{}, MainFormState> {
             </div>
         }
         {
-          this.state.userState.failureMode !== FailureMode.None && <div className="FailureResults">
+          this.state.userState.failureMode !== 0 && <div className="FailureResults">
             <div>With {this.state.userState.replicationFactor}x replication you can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead !== 1 && "s"}.</div>
             <div>This scenario will survive losing at most:</div>
             <div className="FailureTable">
