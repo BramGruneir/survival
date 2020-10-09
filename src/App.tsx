@@ -121,27 +121,23 @@ function limit(num: number, min: number, max: number): number {
 }
 
 type UserState = {
-  numberRegions: number;
-  DCsPerRegion: number;
-  AZsPerDC: number;
-  NodesPerAZ: number;
+  names: Array<string>;
+  counts: Array<number>;
   replicationFactor: number;
   failureMode: FailureMode;
 }
 
 const defaultUserState: UserState = {
-  numberRegions: 1,
-  DCsPerRegion: 3,
-  AZsPerDC: 3,
-  NodesPerAZ: 3,
+  names: ["Regions","Data Centers","Availability Zones", "Nodes"],
+  counts: [1,3,3,3],
   replicationFactor: 3,
   failureMode: FailureMode.Region,
 }
 
 function populateSearch(state: UserState) {
-  let newSearch = qs.stringify(state);
+  let newSearch = qs.stringify(state, {arrayFormat: 'comma'});
   let parsedURL = qs.parseUrl(window.location.href);
-  let oldSearch = qs.stringify(parsedURL.query);
+  let oldSearch = qs.stringify(parsedURL.query, {arrayFormat: 'comma'});
   if (newSearch === oldSearch) {
     return
   }
@@ -150,10 +146,10 @@ function populateSearch(state: UserState) {
 }
 
 function fixUserState(state: UserState): UserState {
-  state.numberRegions = limit(state.numberRegions, 1, 10);
-  state.DCsPerRegion = limit(state.DCsPerRegion, 1, 10);
-  state.AZsPerDC = limit(state.AZsPerDC, 1, 10);
-  state.NodesPerAZ = limit(state.NodesPerAZ, 1, 100);
+  state.counts[0] = limit(state.counts[0], 1, 10);
+  state.counts[1] = limit(state.counts[1], 1, 10);
+  state.counts[2] = limit(state.counts[2], 1, 10);
+  state.counts[3] = limit(state.counts[3], 1, 100);
   if (state.replicationFactor % 2 === 0) {
     state.replicationFactor--;
   }
@@ -163,13 +159,35 @@ function fixUserState(state: UserState): UserState {
 
 function fetchState(): UserState {
   let userState = defaultUserState;
-  Object.entries(qs.parse(window.location.search)).forEach(
+  Object.entries(qs.parse(window.location.search, {arrayFormat: 'comma'})).forEach(
     ([key, value]) => {
+      debugger
       switch (key) {
-        case "numberRegions": userState.numberRegions = parseInt(value + "") || defaultUserState.numberRegions; break;
-        case "DCsPerRegion": userState.DCsPerRegion = parseInt(value + "") || defaultUserState.DCsPerRegion; break;
-        case "AZsPerDC": userState.AZsPerDC = parseInt(value + "") || defaultUserState.AZsPerDC; break;
-        case "NodesPerAZ": userState.NodesPerAZ = parseInt(value + "") || defaultUserState.NodesPerAZ; break;
+        case "counts":
+          if (value == null || !Array.isArray(value)) {
+            userState.counts = defaultUserState.counts;
+            break;
+          }
+          if (!Array.isArray(value)) {
+            userState.counts = defaultUserState.counts;
+            break;
+          }
+          let valueArray = value as Array<string>;
+          valueArray.forEach((v,i) => {
+            userState.counts[i] = parseInt(v + "") || defaultUserState.counts[i];
+          })
+          break;
+        case "names":
+          if (value == null || !Array.isArray(value)) {
+            userState.names = defaultUserState.names;
+            break;
+          }
+          if (!Array.isArray(value)) {
+            userState.names = defaultUserState.names;
+            break;
+          }
+          userState.names = value;
+          break;
         case "replicationFactor": userState.replicationFactor = parseInt(value + "") || defaultUserState.replicationFactor; break;
         case "failureMode": userState.failureMode = parseInt(value + "") || defaultUserState.failureMode; break;
       }
@@ -212,10 +230,7 @@ class MainForm extends React.Component<{}, MainFormState> {
       regions: [],
     };
 
-    this.handleNumberRegionsChange = this.handleNumberRegionsChange.bind(this);
-    this.handleDCsPerRegionChange = this.handleDCsPerRegionChange.bind(this);
-    this.handleAZsPerDCChange = this.handleAZsPerDCChange.bind(this);
-    this.handleNodesPerAZChange = this.handleNodesPerAZChange.bind(this);
+    this.handleCountChange = this.handleCountChange.bind(this)
     this.handleReplicationFactorChange = this.handleReplicationFactorChange.bind(this);
     this.handleFailureModeChange = this.handleFailureModeChange.bind(this);
   }
@@ -247,28 +262,10 @@ class MainForm extends React.Component<{}, MainFormState> {
     };
   }
 
-  handleNumberRegionsChange(event: any) {
-    let value = parseInt(event.target.value) || defaultUserState.numberRegions;
+  handleCountChange(level: number, event: any) {
+    let value = parseInt(event.target.value) || defaultUserState.counts[level];
     let curState = this.getCurrentState();
-    curState.userState.numberRegions = value;
-    this.setState(this.update(curState));
-  }
-  handleDCsPerRegionChange(event: any) {
-    let value = parseInt(event.target.value) || defaultUserState.DCsPerRegion;
-    let curState = this.getCurrentState();
-    curState.userState.DCsPerRegion = value;
-    this.setState(this.update(curState));
-  }
-  handleAZsPerDCChange(event: any) {
-    let value = parseInt(event.target.value) || defaultUserState.AZsPerDC;
-    let curState = this.getCurrentState();
-    curState.userState.AZsPerDC = value;
-    this.setState(this.update(curState));
-  }
-  handleNodesPerAZChange(event: any) {
-    let value = parseInt(event.target.value) || defaultUserState.NodesPerAZ;
-    let curState = this.getCurrentState();
-    curState.userState.NodesPerAZ = value;
+    curState.userState.counts[level] = value;
     this.setState(this.update(curState));
   }
   handleReplicationFactorChange(event: any) {
@@ -300,7 +297,7 @@ class MainForm extends React.Component<{}, MainFormState> {
 
     // Regions
     state.regions = [];
-    for (let r = 0; r < state.userState.numberRegions; r++) {
+    for (let r = 0; r < state.userState.counts[0]; r++) {
       let regionProps: RegionProps = {
         key: "",
         id: r + 1,
@@ -310,7 +307,7 @@ class MainForm extends React.Component<{}, MainFormState> {
       }
 
       // Data Centers
-      for (let d = 0; d < state.userState.DCsPerRegion; d++) {
+      for (let d = 0; d < state.userState.counts[1]; d++) {
         let dataCenterProps: DataCenterProps = {
           key: "",
           id: d + 1,
@@ -320,7 +317,7 @@ class MainForm extends React.Component<{}, MainFormState> {
         }
 
         // Availability Zones
-        for (let a = 0; a < state.userState.AZsPerDC; a++) {
+        for (let a = 0; a < state.userState.counts[2]; a++) {
           let availabilityZoneProps: AvailabilityZoneProps = {
             key: "",
             id: a + 1,
@@ -330,7 +327,7 @@ class MainForm extends React.Component<{}, MainFormState> {
           }
 
           // Nodes
-          for (let a = 0; a < state.userState.NodesPerAZ; a++) {
+          for (let a = 0; a < state.userState.counts[3]; a++) {
             let nodeProps: NodeProps = {
               key: "",
               id: a + 1,
@@ -349,13 +346,13 @@ class MainForm extends React.Component<{}, MainFormState> {
     // Add the example range.  This is not fun, there must be a better way.
     // Replicas per region
     for (let i = 0; i < state.userState.replicationFactor; i++) {
-      let region = i % state.userState.numberRegions;
+      let region = i % state.userState.counts[0];
       state.regions[region].replicas++;
     }
     // Replicas per DC
     state.regions.forEach(r => {
       for (let i = 0; i < r.replicas; i++) {
-        let dc = i % state.userState.DCsPerRegion;
+        let dc = i % state.userState.counts[1];
         r.datacenters[dc].replicas++;
       }
     });
@@ -363,7 +360,7 @@ class MainForm extends React.Component<{}, MainFormState> {
     state.regions.forEach(r =>
       r.datacenters.forEach(dc => {
         for (let i = 0; i < dc.replicas; i++) {
-          let az = i % state.userState.AZsPerDC;
+          let az = i % state.userState.counts[2];
           dc.availabilityZones[az].replicas++;
         }
       })
@@ -374,7 +371,7 @@ class MainForm extends React.Component<{}, MainFormState> {
         dc.availabilityZones.forEach(az => {
           // This is technically not needed, can't put more than one replica on a node.
           for (let i = 0; i < az.replicas; i++) {
-            let n = i % state.userState.NodesPerAZ;
+            let n = i % state.userState.counts[3];
             az.nodes[n].replicas++;
           }
         })
@@ -390,7 +387,7 @@ class MainForm extends React.Component<{}, MainFormState> {
 
     // Regions
     if (state.userState.failureMode === FailureMode.Region) {
-      for (let i = 0; i < state.userState.numberRegions; i++) {
+      for (let i = 0; i < state.userState.counts[0]; i++) {
         if (state.regions[i].replicas === 0) {
           // An empty region means that the range never wrapped and we know the
           // rest of Regions or DCs will be empty.
@@ -418,10 +415,10 @@ class MainForm extends React.Component<{}, MainFormState> {
       let j = 0;
       while (state.deadReplicas < state.allowableDead) {
         i++;
-        if (i >= state.userState.numberRegions) {
+        if (i >= state.userState.counts[0]) {
           i = 0;
           j++;
-          if (j >= state.userState.DCsPerRegion) {
+          if (j >= state.userState.counts[1]) {
             // We are at the end.
             break;
           }
@@ -468,13 +465,13 @@ class MainForm extends React.Component<{}, MainFormState> {
       let k = 0;
       while (state.deadReplicas < state.allowableDead) {
         i++;
-        if (i >= state.userState.numberRegions) {
+        if (i >= state.userState.counts[0]) {
           i = 0;
           j++;
-          if (j >= state.userState.DCsPerRegion) {
+          if (j >= state.userState.counts[1]) {
             j = 0;
             k++;
-            if (k >= state.userState.AZsPerDC) {
+            if (k >= state.userState.counts[2]) {
               // We are at the end.
               break;
             }
@@ -526,16 +523,16 @@ class MainForm extends React.Component<{}, MainFormState> {
       let l = 0;
       while (state.deadReplicas < state.allowableDead) {
         i++;
-        if (i >= state.userState.numberRegions) {
+        if (i >= state.userState.counts[0]) {
           i = 0;
           j++;
-          if (j >= state.userState.DCsPerRegion) {
+          if (j >= state.userState.counts[1]) {
             j = 0;
             k++;
-            if (k >= state.userState.AZsPerDC) {
+            if (k >= state.userState.counts[2]) {
               k = 0;
               l++;
-              if (l >= state.userState.NodesPerAZ) {
+              if (l >= state.userState.counts[3]) {
                 // We are at the end.
                 break;
               }
@@ -594,10 +591,10 @@ class MainForm extends React.Component<{}, MainFormState> {
     let regions = this.state.regions.map((r) =>
       <Region {...r} />
     );
-    let nodeCount = this.state.userState.numberRegions *
-      this.state.userState.DCsPerRegion *
-      this.state.userState.AZsPerDC *
-      this.state.userState.NodesPerAZ;
+    let nodeCount = this.state.userState.counts[0] *
+      this.state.userState.counts[1] *
+      this.state.userState.counts[2] *
+      this.state.userState.counts[3];
     return (
       <div>
         <div className="App-form">
@@ -605,27 +602,28 @@ class MainForm extends React.Component<{}, MainFormState> {
             <table className="App-table">
               <thead>
                 <tr>
-                  <th>Regions</th>
-                  <th>DCs per Region</th>
-                  <th>AZs per DC</th>
-                  <th>Nodes per AZ</th>
+                  {
+                    this.state.userState.names.map(name =>
+                      <th key={name}>{name}</th>
+                    )
+                  }
                   <th>Replication Factor</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td>
-                    <input className="App-input" type="number" value={this.state.userState.numberRegions} onChange={this.handleNumberRegionsChange} />
-                  </td>
-                  <td>
-                    <input className="App-input" name="DCsPerRegion" type="number" value={this.state.userState.DCsPerRegion} onChange={this.handleDCsPerRegionChange} />
-                  </td>
-                  <td>
-                    <input className="App-input" name="AZsPerDC" type="number" value={this.state.userState.AZsPerDC} onChange={this.handleAZsPerDCChange} />
-                  </td>
-                  <td>
-                    <input className="App-input" name="NodesPerAZ" type="number" value={this.state.userState.NodesPerAZ} onChange={this.handleNodesPerAZChange} />
-                  </td>
+                  {
+                    this.state.userState.names.map((name, i) =>
+                      <td>
+                        <input className="App-input"
+                          type="number"
+                          name={name}
+                          key={i}
+                          value={this.state.userState.counts[i]}
+                          onChange={(e) => this.handleCountChange(i, e)} />
+                      </td>
+                    )
+                  }
                   <td>
                     <input className="App-input" name="replicationFactor" type="number" value={this.state.userState.replicationFactor} onChange={this.handleReplicationFactorChange} />
                   </td>
