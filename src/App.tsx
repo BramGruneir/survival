@@ -120,7 +120,7 @@ function limit(num: number, min: number, max: number): number {
   return num;
 }
 
-interface UserState {
+type UserState = {
   numberRegions: number;
   DCsPerRegion: number;
   AZsPerDC: number;
