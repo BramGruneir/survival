@@ -1,12 +1,14 @@
 import React from 'react';
 import './App.css';
 import qs from "query-string";
+import pluralize from "pluralize";
 
 interface NodeProps {
   key: string;
   id: number;
   failed: boolean;
   replicas: number;
+  name: string;
 }
 
 function generateKey(props: NodeProps): string {
@@ -30,7 +32,7 @@ class Node extends React.Component<NodeProps, {}> {
     let replicaClassName = this.props.replicas > 0 ? "Replicas-full" : "Replicas-empty";
     return (
       <div className={`${boxClassName}`}>
-        <div>Node {this.props.id}</div>
+        <div>{this.props.name} {this.props.id}</div>
         <div className={`${replicaClassName}`}>Replicas {this.props.replicas}</div>
       </div>
     );
@@ -50,7 +52,7 @@ class AvailabilityZone extends React.Component<AvailabilityZoneProps, {}> {
     let replicaClassName = this.props.replicas > 0 ? "Replicas-full" : "Replicas-empty";
     return (
       <div className={`${boxClassName}`}>
-        <div>AZ {this.props.id}</div>
+        <div>{this.props.name} {this.props.id}</div>
         <div className={`${replicaClassName}`}>Replicas {this.props.replicas}</div>
         {nodes}
       </div>
@@ -71,7 +73,7 @@ class DataCenter extends React.Component<DataCenterProps, {}> {
     let replicaClassName = this.props.replicas > 0 ? "Replicas-full" : "Replicas-empty";
     return (
       <div className={`${boxClassName}`}>
-        <div>DC {this.props.id}</div>
+        <div>{this.props.name} {this.props.id}</div>
         <div className={`${replicaClassName}`}>Replicas {this.props.replicas}</div>
         {azs}
       </div>
@@ -92,7 +94,7 @@ class Region extends React.Component<RegionProps, {}> {
     let replicaClassName = this.props.replicas > 0 ? "Replicas-full" : "Replicas-empty";
     return (
       <div className={`${boxClassName}`}>
-        <div>Region {this.props.id}</div>
+        <div>{this.props.name} {this.props.id}</div>
         <div className={`${replicaClassName}`}>Replicas {this.props.replicas}</div>
         <div className="App-container">
           {dcs}
@@ -304,6 +306,7 @@ class MainForm extends React.Component<{}, MainFormState> {
         failed: false,
         datacenters: [],
         replicas: 0,
+        name: pluralize.singular(state.userState.names[0]),
       }
 
       // Data Centers
@@ -314,6 +317,7 @@ class MainForm extends React.Component<{}, MainFormState> {
           failed: false,
           replicas: 0,
           availabilityZones: [],
+          name: pluralize.singular(state.userState.names[1]),
         }
 
         // Availability Zones
@@ -324,6 +328,7 @@ class MainForm extends React.Component<{}, MainFormState> {
             failed: false,
             replicas: 0,
             nodes: [],
+            name: pluralize.singular(state.userState.names[2]),
           }
 
           // Nodes
@@ -333,6 +338,7 @@ class MainForm extends React.Component<{}, MainFormState> {
               id: a + 1,
               failed: false,
               replicas: 0,
+              name: pluralize.singular(state.userState.names[3]),
             }
             availabilityZoneProps.nodes.push(nodeProps);
           }
@@ -604,7 +610,7 @@ class MainForm extends React.Component<{}, MainFormState> {
                 <tr>
                   {
                     this.state.userState.names.map(name =>
-                      <th key={name}>{name}</th>
+                      <th key={name}>{pluralize.plural(name)}</th>
                     )
                   }
                   <th>Replication Factor</th>
@@ -634,10 +640,10 @@ class MainForm extends React.Component<{}, MainFormState> {
               <div>Failure Mode:</div>
               <select className="FailureSelect" value={this.state.userState.failureMode} onChange={this.handleFailureModeChange}>
                 <option value={FailureMode.None}>None</option>
-                <option value={FailureMode.Region}>Region</option>
-                <option value={FailureMode.DataCenter}>DataCenter</option>
-                <option value={FailureMode.AvailabilityZone}>AvailabilityZone</option>
-                <option value={FailureMode.Node}>Node</option>
+                <option value={FailureMode.Region}>{pluralize.singular(this.state.userState.names[0])}</option>
+                <option value={FailureMode.DataCenter}>{pluralize.singular(this.state.userState.names[1])}</option>
+                <option value={FailureMode.AvailabilityZone}>{pluralize.singular(this.state.userState.names[2])}</option>
+                <option value={FailureMode.Node}>{pluralize.singular(this.state.userState.names[3])}</option>
               </select>
             </div>
           </form>
@@ -655,7 +661,7 @@ class MainForm extends React.Component<{}, MainFormState> {
               {!!this.state.failedRegions &&
                 <div className="FailureRow">
                   <div className="FailureColumn">
-                    <div className="FailureHeader">Regions</div>
+                    <div className="FailureHeader">{pluralize.plural(this.state.userState.names[0])}</div>
                   </div>
                   <div className="FailureColumn">
                     <div className="FailureValue">{this.state.failedRegions}</div>
@@ -665,7 +671,7 @@ class MainForm extends React.Component<{}, MainFormState> {
               {!!(this.state.failedRegions || this.state.failedDCs) &&
                 <div className="FailureRow">
                   <div className="FailureColumn">
-                    <div className="FailureHeader">Data Centers</div>
+                    <div className="FailureHeader">{pluralize.plural(this.state.userState.names[1])}</div>
                   </div>
                   <div className="FailureColumn">
                     <div className="FailureValue">{this.state.failedDCs}</div>
@@ -675,7 +681,7 @@ class MainForm extends React.Component<{}, MainFormState> {
               {!!(this.state.failedRegions || this.state.failedDCs || this.state.failedAZs) &&
                 <div className="FailureRow">
                   <div className="FailureColumn">
-                    <div className="FailureHeader">Availability Zones</div>
+                    <div className="FailureHeader">{pluralize.plural(this.state.userState.names[2])}</div>
                   </div>
                   <div className="FailureColumn">
                     <div className="FailureValue">{this.state.failedAZs}</div>
@@ -684,7 +690,7 @@ class MainForm extends React.Component<{}, MainFormState> {
               }
               <div className="FailureRow">
                 <div className="FailureColumn">
-                  <div className="FailureHeader">Nodes</div>
+                  <div className="FailureHeader">{pluralize.plural(this.state.userState.names[3])}</div>
                 </div>
                 <div className="FailureColumn">
                   <div className="FailureValue">{this.state.failedNodes}</div>
