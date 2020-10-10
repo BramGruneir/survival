@@ -9,6 +9,8 @@ interface NodeProps {
   failed: boolean;
   replicas: number;
   name: string;
+  children: Array<NodeProps>;
+  className: string;
 }
 
 function generateKey(props: NodeProps): string {
@@ -28,24 +30,7 @@ function pickBoxClass(node: NodeProps): string {
 
 class Node extends React.Component<NodeProps, {}> {
   render() {
-    let boxClassName = pickBoxClass(this.props);
-    let replicaClassName = this.props.replicas > 0 ? "Replicas-full" : "Replicas-empty";
-    return (
-      <div className={`${boxClassName}`}>
-        <div>{this.props.name} {this.props.id}</div>
-        <div className={`${replicaClassName}`}>Replicas {this.props.replicas}</div>
-      </div>
-    );
-  }
-}
-
-interface AvailabilityZoneProps extends NodeProps {
-  nodes: Array<NodeProps>;
-}
-
-class AvailabilityZone extends React.Component<AvailabilityZoneProps, {}> {
-  render() {
-    let nodes = this.props.nodes.map((n) =>
+    const children = this.props.children.map((n) =>
       <Node {...n} />
     );
     let boxClassName = pickBoxClass(this.props);
@@ -54,50 +39,8 @@ class AvailabilityZone extends React.Component<AvailabilityZoneProps, {}> {
       <div className={`${boxClassName}`}>
         <div>{this.props.name} {this.props.id}</div>
         <div className={`${replicaClassName}`}>Replicas {this.props.replicas}</div>
-        {nodes}
-      </div>
-    );
-  }
-}
-
-interface DataCenterProps extends NodeProps {
-  availabilityZones: Array<AvailabilityZoneProps>;
-}
-
-class DataCenter extends React.Component<DataCenterProps, {}> {
-  render() {
-    let azs = this.props.availabilityZones.map((az) =>
-      <AvailabilityZone {...az} />
-    );
-    let boxClassName = pickBoxClass(this.props);
-    let replicaClassName = this.props.replicas > 0 ? "Replicas-full" : "Replicas-empty";
-    return (
-      <div className={`${boxClassName}`}>
-        <div>{this.props.name} {this.props.id}</div>
-        <div className={`${replicaClassName}`}>Replicas {this.props.replicas}</div>
-        {azs}
-      </div>
-    );
-  }
-}
-
-interface RegionProps extends NodeProps {
-  datacenters: Array<DataCenterProps>;
-}
-
-class Region extends React.Component<RegionProps, {}> {
-  render() {
-    let dcs = this.props.datacenters.map((dc) =>
-      <DataCenter {...dc} />
-    );
-    let boxClassName = pickBoxClass(this.props);
-    let replicaClassName = this.props.replicas > 0 ? "Replicas-full" : "Replicas-empty";
-    return (
-      <div className={`${boxClassName}`}>
-        <div>{this.props.name} {this.props.id}</div>
-        <div className={`${replicaClassName}`}>Replicas {this.props.replicas}</div>
-        <div className="App-container">
-          {dcs}
+        <div className={this.props.className}>
+          {children}
         </div>
       </div>
     );
@@ -121,11 +64,13 @@ type UserState = {
   failureMode: number;
 }
 
-const defaultUserState: UserState = {
-  names: ["Regions","Data Centers","Availability Zones", "Nodes"],
-  counts: [1,3,3,3],
-  replicationFactor: 3,
-  failureMode: 1,
+function GetDefaultUserState(): UserState {
+  return {
+    names: ["Regions","Data Centers","Availability Zones","Nodes","wah?"],
+    counts: [1,3,3,3],
+    replicationFactor: 3,
+    failureMode: 1,
+  }
 }
 
 function populateSearch(state: UserState) {
@@ -140,6 +85,11 @@ function populateSearch(state: UserState) {
 }
 
 function fixUserState(state: UserState): UserState {
+  const defaultUserState = GetDefaultUserState();
+  state.names[0] = state.names[0] || defaultUserState.names[0];
+  state.names[1] = state.names[1] || defaultUserState.names[1];
+  state.names[2] = state.names[2] || defaultUserState.names[2];
+  state.names[3] = state.names[3] || defaultUserState.names[3];
   state.counts[0] = limit(state.counts[0], 1, 10);
   state.counts[1] = limit(state.counts[1], 1, 10);
   state.counts[2] = limit(state.counts[2], 1, 10);
@@ -153,7 +103,8 @@ function fixUserState(state: UserState): UserState {
 }
 
 function fetchState(): UserState {
-  let userState = defaultUserState;
+  const defaultUserState = GetDefaultUserState();
+  let userState = GetDefaultUserState();
   Object.entries(qs.parse(window.location.search, {arrayFormat: 'comma'})).forEach(
     ([key, value]) => {
       switch (key) {
@@ -196,14 +147,14 @@ interface MainFormState {
   failures: Array<number>;
   deadReplicas: number;
   allowableDead: number;
-  regions: Array<RegionProps>;
+  regions: Array<NodeProps>;
 }
 
 class MainForm extends React.Component<{}, MainFormState> {
   constructor(props: any) {
     super(props);
 
-    let userState = defaultUserState;
+    let userState = GetDefaultUserState();
     if (window.location.search.length === 0) {
       populateSearch(userState);
     } else {
@@ -248,12 +199,14 @@ class MainForm extends React.Component<{}, MainFormState> {
   }
 
   handleCountChange(level: number, event: any) {
+    const defaultUserState = GetDefaultUserState();
     let value = parseInt(event.target.value) || defaultUserState.counts[level];
     let curState = this.getCurrentState();
     curState.userState.counts[level] = value;
     this.setState(this.update(curState));
   }
   handleReplicationFactorChange(event: any) {
+    const defaultUserState = GetDefaultUserState();
     let value = parseInt(event.target.value) || defaultUserState.replicationFactor;
     if (value % 2 === 0) {
       if (this.state.userState.replicationFactor > value) {
@@ -283,35 +236,38 @@ class MainForm extends React.Component<{}, MainFormState> {
     // Regions
     state.regions = [];
     for (let r = 0; r < state.userState.counts[0]; r++) {
-      let regionProps: RegionProps = {
+      let regionProps: NodeProps = {
         key: "",
         id: r + 1,
         failed: false,
-        datacenters: [],
         replicas: 0,
         name: pluralize.singular(state.userState.names[0]),
+        children: [],
+        className: "App-container",
       }
 
       // Data Centers
       for (let d = 0; d < state.userState.counts[1]; d++) {
-        let dataCenterProps: DataCenterProps = {
+        let dataCenterProps: NodeProps = {
           key: "",
           id: d + 1,
           failed: false,
           replicas: 0,
-          availabilityZones: [],
           name: pluralize.singular(state.userState.names[1]),
+          children: [],
+          className: "level2",
         }
 
         // Availability Zones
         for (let a = 0; a < state.userState.counts[2]; a++) {
-          let availabilityZoneProps: AvailabilityZoneProps = {
+          let availabilityZoneProps: NodeProps = {
             key: "",
             id: a + 1,
             failed: false,
             replicas: 0,
-            nodes: [],
             name: pluralize.singular(state.userState.names[2]),
+            children: [],
+            className: "level3",
           }
 
           // Nodes
@@ -322,12 +278,14 @@ class MainForm extends React.Component<{}, MainFormState> {
               failed: false,
               replicas: 0,
               name: pluralize.singular(state.userState.names[3]),
+              children: [],
+              className: "level4",
             }
-            availabilityZoneProps.nodes.push(nodeProps);
+            availabilityZoneProps.children.push(nodeProps);
           }
-          dataCenterProps.availabilityZones.push(availabilityZoneProps);
+          dataCenterProps.children.push(availabilityZoneProps);
         }
-        regionProps.datacenters.push(dataCenterProps);
+        regionProps.children.push(dataCenterProps);
       }
       state.regions.push(regionProps);
     }
@@ -342,26 +300,26 @@ class MainForm extends React.Component<{}, MainFormState> {
     state.regions.forEach(r => {
       for (let i = 0; i < r.replicas; i++) {
         let dc = i % state.userState.counts[1];
-        r.datacenters[dc].replicas++;
+        r.children[dc].replicas++;
       }
     });
     // Replicas per AZ
     state.regions.forEach(r =>
-      r.datacenters.forEach(dc => {
+      r.children.forEach(dc => {
         for (let i = 0; i < dc.replicas; i++) {
           let az = i % state.userState.counts[2];
-          dc.availabilityZones[az].replicas++;
+          dc.children[az].replicas++;
         }
       })
     );
     // Replicas per Nodes
     state.regions.forEach(r =>
-      r.datacenters.forEach(dc =>
-        dc.availabilityZones.forEach(az => {
+      r.children.forEach(dc =>
+        dc.children.forEach(az => {
           // This is technically not needed, can't put more than one replica on a node.
           for (let i = 0; i < az.replicas; i++) {
             let n = i % state.userState.counts[3];
-            az.nodes[n].replicas++;
+            az.children[n].replicas++;
           }
         })
       )
@@ -414,14 +372,14 @@ class MainForm extends React.Component<{}, MainFormState> {
           continue;
         }
         if ((state.regions[i].replicas === 0) ||
-          (state.regions[i].datacenters[j].replicas === 0)) {
+          (state.regions[i].children[j].replicas === 0)) {
           // An empty region or datacenter means that the range never wrapped
           // and we know the rest of Regions or DCs will be empty.
           break;
         }
-        if (state.deadReplicas + state.regions[i].datacenters[j].replicas <= state.allowableDead) {
-          state.regions[i].datacenters[j].failed = true;
-          state.deadReplicas += state.regions[i].datacenters[j].replicas;
+        if (state.deadReplicas + state.regions[i].children[j].replicas <= state.allowableDead) {
+          state.regions[i].children[j].failed = true;
+          state.deadReplicas += state.regions[i].children[j].replicas;
           state.failures[1]++;
         } else {
           // Don't continue here as these are traversed in order. This ensures
@@ -464,21 +422,21 @@ class MainForm extends React.Component<{}, MainFormState> {
           }
         }
         if (state.regions[i].failed ||
-          state.regions[i].datacenters[j].failed) {
+          state.regions[i].children[j].failed) {
           // Skip all failed regions and datacenters.
           continue;
         }
         if ((state.regions[i].replicas === 0) ||
-          (state.regions[i].datacenters[j].replicas === 0) ||
-          (state.regions[i].datacenters[j].availabilityZones[k].replicas === 0)) {
+          (state.regions[i].children[j].replicas === 0) ||
+          (state.regions[i].children[j].children[k].replicas === 0)) {
           // An empty region, DC or AZ means that the range never wrapped
           // and we know the rest of Regions, DCs or AZs will be empty.
           break;
         }
 
-        if (state.deadReplicas + state.regions[i].datacenters[j].availabilityZones[k].replicas <= state.allowableDead) {
-          state.regions[i].datacenters[j].availabilityZones[k].failed = true;
-          state.deadReplicas += state.regions[i].datacenters[j].availabilityZones[k].replicas;
+        if (state.deadReplicas + state.regions[i].children[j].children[k].replicas <= state.allowableDead) {
+          state.regions[i].children[j].children[k].failed = true;
+          state.deadReplicas += state.regions[i].children[j].children[k].replicas;
           state.failures[2]++;
         } else {
           // Don't continue here as these are traversed in order. This ensures
@@ -526,24 +484,24 @@ class MainForm extends React.Component<{}, MainFormState> {
           }
         }
         if (state.regions[i].failed ||
-          state.regions[i].datacenters[j].failed ||
-          state.regions[i].datacenters[j].availabilityZones[k].failed
+          state.regions[i].children[j].failed ||
+          state.regions[i].children[j].children[k].failed
         ) {
           // Skip all failed regions, DCs and AZs.
           continue;
         }
         if ((state.regions[i].replicas === 0) ||
-          (state.regions[i].datacenters[j].replicas === 0) ||
-          (state.regions[i].datacenters[j].availabilityZones[k].replicas === 0) ||
-          (state.regions[i].datacenters[j].availabilityZones[k].nodes[l].replicas === 0)) {
+          (state.regions[i].children[j].replicas === 0) ||
+          (state.regions[i].children[j].children[k].replicas === 0) ||
+          (state.regions[i].children[j].children[k].children[l].replicas === 0)) {
           // An empty region, DC, AZ or node means that the range never wrapped
           // and we know the rest of Regions, DCs, AZs or nodes will be empty.
           break;
         }
 
-        if (state.deadReplicas + state.regions[i].datacenters[j].availabilityZones[k].nodes[l].replicas <= state.allowableDead) {
-          state.regions[i].datacenters[j].availabilityZones[k].nodes[l].failed = true;
-          state.deadReplicas += state.regions[i].datacenters[j].availabilityZones[k].nodes[l].replicas;
+        if (state.deadReplicas + state.regions[i].children[j].children[k].children[l].replicas <= state.allowableDead) {
+          state.regions[i].children[j].children[k].children[l].failed = true;
+          state.deadReplicas += state.regions[i].children[j].children[k].children[l].replicas;
           state.failures[3]++;
         } else {
           // Don't continue here as these are traversed in order. This ensures
@@ -559,11 +517,11 @@ class MainForm extends React.Component<{}, MainFormState> {
     // Add all the keys.
     state.regions.forEach(r => {
       r.key = generateKey(r);
-      r.datacenters.forEach(dc => {
+      r.children.forEach(dc => {
         dc.key = generateKey(dc);
-        dc.availabilityZones.forEach(az => {
+        dc.children.forEach(az => {
           az.key = generateKey(az);
-          az.nodes.forEach(n => {
+          az.children.forEach(n => {
             n.key = generateKey(n);
           });
         });
@@ -575,7 +533,7 @@ class MainForm extends React.Component<{}, MainFormState> {
 
   render() {
     let regions = this.state.regions.map((r) =>
-      <Region {...r} />
+      <Node {...r} />
     );
     let nodeCount = this.state.userState.counts.reduce((a,b) => a + b, 0);
     return (
