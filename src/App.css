@@ -43,6 +43,13 @@
         justify-content: center;
     }
     
+    .level1 {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
     .Box {
         width: fit-content;
         height: fit-content;
@@ -102,6 +109,7 @@
     .Underreplicated {
         color: red;
         font-size: x-large;
+        padding: 20px;
     }
     
     .FailureMode {
