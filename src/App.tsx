@@ -12,6 +12,7 @@ const Max_vCPUs = 256;
 const Min_vCPUs= 2;
 
 const Bytes_per_vCPU = xbytes.parseBytes("150 GB").bytes;
+const CompressionRatio = 0.4;
 const IOPS_per_vCPU = 500;
 const MBPS_per_vCPU = 30;
 const Connections_per_vCPU = 4;
@@ -70,7 +71,7 @@ function calculateSpecs(
     Storage: {
       Capacity: vCPUs * Bytes_per_vCPU,
       CapacityPerNode: vCPUs * Bytes_per_vCPU / nodeCount,
-      RealCapacity: vCPUs * Bytes_per_vCPU / replicationFactor,
+      RealCapacity: (vCPUs * Bytes_per_vCPU / replicationFactor) * (1 + CompressionRatio),
       IOPS: vCPUs * IOPS_per_vCPU,
       IOPS_per_node: IOPS_per_vCPU * vCPUs_per_node,
       MBPS: vCPUs * MBPS_per_vCPU,
@@ -267,7 +268,8 @@ class MainForm extends React.Component<{}, MainFormState> {
       specs: calculateSpecs(0, 0, 0, 0),
     };
 
-    this.handleCountChange = this.handleCountChange.bind(this)
+    this.handleCountChange = this.handleCountChange.bind(this);
+    this.handleNameChange = this.handleNameChange.bind(this);
     this.handleReplicationFactorChange = this.handleReplicationFactorChange.bind(this);
     this.handleFailureModeChange = this.handleFailureModeChange.bind(this);
     this.handleLevelsChange = this.handleLevelsChange.bind(this);
@@ -307,6 +309,11 @@ class MainForm extends React.Component<{}, MainFormState> {
     // Allow 0, so it can be reset to 1, but don't allow undef or other weirdness.
     value = value === 0 ? value : value || defaultUserState.counts[level];
     curState.userState.counts[level] = value;
+    this.setState(this.update(curState));
+  }
+  handleNameChange(level: number, event: any) {
+    let curState = this.getCurrentState();
+    curState.userState.names[level] = event.target.value;
     this.setState(this.update(curState));
   }
   handleReplicationFactorChange(event: any) {
@@ -528,6 +535,7 @@ class MainForm extends React.Component<{}, MainFormState> {
     });
     return (
       <div>
+        <h1>CockroachDB Survival Tool</h1>
         <div className="App-form">
           <form>
             <table className="App-table">
@@ -535,10 +543,17 @@ class MainForm extends React.Component<{}, MainFormState> {
                 <tr>
                   {
                     this.state.userState.names.map((name, i) => {
-                      return <th key={`title-${name}-${i}`}>{plural(name)}</th>;
+                      return <th key={`title-${i}`}>
+                        <input className="NameInput"
+                          type="text"
+                          name={plural(name)}
+                          value={this.state.userState.names[i]}
+                          onChange={(e) => this.handleNameChange(i, e)} />
+                      </th>;
                     })
                   }
                   <th>Replication Factor</th>
+                  <th>Topology Levels</th>
                 </tr>
               </thead>
               <tbody>
@@ -557,18 +572,25 @@ class MainForm extends React.Component<{}, MainFormState> {
                   <td>
                     <input className="App-input" name="replicationFactor" type="number" value={this.state.userState.replicationFactor} onChange={this.handleReplicationFactorChange} />
                   </td>
+                  <td>
+                  <input className="App-input"
+                    type="number"
+                    name="levels"
+                    value={this.state.userState.levelCount}
+                    onChange={this.handleLevelsChange} />
+                  </td>
                 </tr>
               </tbody>
             </table>
             <div className="Selector">
               <div>Failure Mode:</div>
               <select className="FailureSelect" value={this.state.userState.failureMode} onChange={this.handleFailureModeChange}>
-                <option value={0}>None</option>
                 {
                   this.state.userState.names.map((n,i) =>
                     <option value={i+1} key={`failureMode-${n}-${i}`}>{singular(n)}</option>
                   )
                 }
+                <option value={0}>None</option>
               </select>
             </div>
           </form>
@@ -609,16 +631,6 @@ class MainForm extends React.Component<{}, MainFormState> {
           }
         </div>
         <form>
-          <div className="Selector">
-            <div>Number of Levels:</div>
-            <input className="App-input"
-               type="number"
-               name="levels"
-               value={this.state.userState.levelCount}
-               onChange={this.handleLevelsChange} />
-          </div>
-        </form>
-        <form>
           <div className="Footer">
             <h2>Sizing Calculations</h2>
             <div className="Selector">
@@ -645,21 +657,21 @@ class MainForm extends React.Component<{}, MainFormState> {
                 <div className="SizingRpw">
                   <div className="SizingColumn">
                     <div className="SizingValue">
-                      {xbytes(this.state.specs.Storage.RealCapacity, {iec: true})} ({xbytes(this.state.specs.Storage.RealCapacity, {iec: false})}) actual storage (due to {this.state.userState.replicationFactor}x replication)
+        {xbytes(this.state.specs.Storage.RealCapacity, {iec: true})} ({xbytes(this.state.specs.Storage.RealCapacity, {iec: false})}) actual storage (due to {this.state.userState.replicationFactor}x replication and a compression ratio of {CompressionRatio*100}%)
                     </div>
                   </div>
                 </div>
                 <div className="SizingRpw">
                   <div className="SizingColumn">
                     <div className="SizingValue">
-                      {this.state.specs.Storage.IOPS} IOPS total, {this.state.specs.Storage.IOPS_per_node} IOPS per {singular(nodeName)}
+                      {this.state.specs.Storage.IOPS.toLocaleString()} IOPS total, {this.state.specs.Storage.IOPS_per_node.toLocaleString()} IOPS per {singular(nodeName)}
                     </div>
                   </div>
                 </div>
                 <div className="SizingRpw">
                   <div className="SizingColumn">
                     <div className="SizingValue">
-                      {this.state.specs.Storage.MBPS} MBPS total, {this.state.specs.Storage.MBPS_per_node} MBPS per {singular(nodeName)}
+                      {this.state.specs.Storage.MBPS.toLocaleString()} MBPS total, {this.state.specs.Storage.MBPS_per_node.toLocaleString()} MBPS per {singular(nodeName)}
                     </div>
                   </div>
                 </div>
@@ -672,7 +684,7 @@ class MainForm extends React.Component<{}, MainFormState> {
                 </div>
                 <div className="SizingRpw">
                   <div className="SizingColumn">
-                    <div className="SizingValue">{this.state.specs.Concurrency.Connections} concurrent <i>active</i> connections</div>
+                    <div className="SizingValue">{this.state.specs.Concurrency.Connections.toLocaleString()} concurrent <i>active</i> connections</div>
                   </div>
                 </div>
               </div>
