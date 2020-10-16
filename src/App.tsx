@@ -48,20 +48,24 @@ interface Spec {
     Capacity: number,
     RealCapacity: number,
     IOPS: number,
+    IOPS_per_node: number,
     MBPS: number,
+    MBPS_per_node: number,
   },
   Concurrency: {
     Connections: number,
   }
 }
 
-function calculateSpecs(vCPUs: number, replicationFactor: number): Spec {
+function calculateSpecs(vCPUs: number, replicationFactor: number, vCPUs_per_node: number): Spec {
   return {
     Storage: {
       Capacity: vCPUs * Bytes_per_vCPU,
       RealCapacity: vCPUs * Bytes_per_vCPU / replicationFactor,
       IOPS: vCPUs * IOPS_per_vCPU,
+      IOPS_per_node: IOPS_per_vCPU*vCPUs_per_node,
       MBPS: vCPUs * MBPS_per_vCPU,
+      MBPS_per_node: MBPS_per_vCPU*vCPUs_per_node,
     },
     Concurrency: {
       Connections: vCPUs * Connections_per_vCPU,
@@ -250,7 +254,7 @@ class MainForm extends React.Component<{}, MainFormState> {
         depth: 0,
       },
       nodeCount: 0,
-      specs: calculateSpecs(0, 0),
+      specs: calculateSpecs(0, 0, 0),
     };
 
     this.handleCountChange = this.handleCountChange.bind(this)
@@ -484,7 +488,11 @@ class MainForm extends React.Component<{}, MainFormState> {
     state.failures.shift()
 
     // Calculate the specs.
-    state.specs = calculateSpecs(state.userState.vCPUs*state.nodeCount, state.userState.replicationFactor);
+    state.specs = calculateSpecs(
+      state.userState.vCPUs*state.nodeCount,
+      state.userState.replicationFactor,
+      state.nodeCount,
+    );
 
     return state;
   }
@@ -627,12 +635,16 @@ class MainForm extends React.Component<{}, MainFormState> {
                 </div>
                 <div className="SizingRpw">
                   <div className="SizingColumn">
-                    <div className="SizingValue">{this.state.specs.Storage.IOPS} IOPS</div>
+                    <div className="SizingValue">
+                      {this.state.specs.Storage.IOPS} IOPS total, {this.state.specs.Storage.IOPS_per_node} IOPS per {singular(nodeName)}
+                    </div>
                   </div>
                 </div>
                 <div className="SizingRpw">
                   <div className="SizingColumn">
-                    <div className="SizingValue">{this.state.specs.Storage.MBPS} MBPS</div>
+                  <div className="SizingValue">
+                      {this.state.specs.Storage.MBPS} MBPS total, {this.state.specs.Storage.MBPS_per_node} MBPS per {singular(nodeName)}
+                    </div>
                   </div>
                 </div>
                 <div className="SizingRpw">
@@ -643,16 +655,18 @@ class MainForm extends React.Component<{}, MainFormState> {
               </div>
               <div>
                 <i>
-                  *Please note that these values are rough approximations for some back of the envelope calculations only.
+                  *Please note that these values are rough approximations based on some back of the envelope calculations.
                 </i>
               </div>
               <div>
                 <i>
-                  Contact Cockroach Labs for a more complete and accurate sizing calculation.
+                  <b>
+                    Contact Cockroach Labs for a more complete and accurate sizing calculation.
+                  </b>
                 </i>
               </div>
-              </div>
             </div>
+          </div>
         </form>
       </div>
     );
