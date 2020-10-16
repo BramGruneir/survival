@@ -43,6 +43,13 @@
         justify-content: center;
     }
     
+    .level1 {
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
     .Box {
         width: fit-content;
         height: fit-content;
@@ -102,6 +109,7 @@
     .Underreplicated {
         color: red;
         font-size: x-large;
+        padding: 20px;
     }
     
     .FailureMode {
@@ -140,10 +148,60 @@
         padding-right: 10px;
     }
     
-    .FailureHeader {
+    .FailureHeaderDisplay {
         text-align: right;
     }
     
-    .FailureValue {
+    .FailureHeaderWarning {
+        text-align: right;
+        color: red;
+    }
+    
+    .FailureValueDisplay {
         text-align: left;
+    }
+    
+    .FailureValueWarning {
+        text-align: left;
+        color: red;
+    }
+    
+    .Selector {
+        font-size: x-large;
+        text-align: center;
+    }
+    
+    .Footer {
+        padding: 40px;
+    }
+    
+    .SizingResults {
+        font-size: x-large;
+        color: yellow;
+        margin: 20px;
+        text-align: center;
+    }
+    
+    .SizingTable {
+        padding: 20px;
+    }
+    
+    .SizingRow {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        width: 100%;
+    }
+    
+    .SizingColumn {
+        display: flex;
+        flex-direction: column;
+        flex-basis: 100%;
+        flex: 1;
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    
+    .SizingValue {
+        text-align: center;
     }

@@ -1,17 +1,95 @@
 import React from 'react';
 import './App.css';
 import qs from "query-string";
+import pluralize from "pluralize";
+import xbytes from 'xbytes';
+
+
+const MaxLevelCount = 5;
+const DefaultLevelCount = 3;
+const DefaultReplicationFactor = 3;
+const Max_vCPUs = 256;
+const Min_vCPUs= 2;
+
+const Bytes_per_vCPU = xbytes.parseBytes("150 GB").bytes;
+const IOPS_per_vCPU = 500;
+const MBPS_per_vCPU = 30;
+const Connections_per_vCPU = 4;
+const RAM_per_vCPU = xbytes.parseBytes("4 GiB").bytes;
+
+const DefaultNamesByLevel: { [count: number]: Array<string> } = {
+  1: ["Nodes"],
+  2: ["Data Centers", "Nodes"],
+  3: ["Regions", "Availability Zones", "Nodes"],
+  4: ["Regions","Data Centers","Availability Zones","Nodes"],
+  5: ["Regions","Data Centers","Availability Zones","Racks","Nodes"],
+};
+
+const DefaultCountsByLevel: { [count: number]: Array<number> } = {
+  1: [3],
+  2: [3,3],
+  3: [3,3,3],
+  4: [3,3,3,3],
+  5: [3,3,3,3,3],
+}
 
 interface NodeProps {
   key: string;
   id: number;
   failed: boolean;
   replicas: number;
+  name: string;
+  children: Array<NodeProps>;
+  className: string;
+  depth: number;
 }
 
-function generateKey(props: NodeProps): string {
-  //return `${props.id}-${props.replicas}-${props.failed}`;
-  return Math.random().toString();
+interface Spec {
+  Storage: {
+    Capacity: number,
+    CapacityPerNode: number,
+    RealCapacity: number,
+    IOPS: number,
+    IOPS_per_node: number,
+    MBPS: number,
+    MBPS_per_node: number,
+    RAM_per_node: number,
+  },
+  Concurrency: {
+    Connections: number,
+  }
+}
+
+function calculateSpecs(
+  vCPUs: number,
+  replicationFactor: number,
+  vCPUs_per_node: number,
+  nodeCount: number,
+  ): Spec {
+  return {
+    Storage: {
+      Capacity: vCPUs * Bytes_per_vCPU,
+      CapacityPerNode: vCPUs * Bytes_per_vCPU / nodeCount,
+      RealCapacity: vCPUs * Bytes_per_vCPU / replicationFactor,
+      IOPS: vCPUs * IOPS_per_vCPU,
+      IOPS_per_node: IOPS_per_vCPU * vCPUs_per_node,
+      MBPS: vCPUs * MBPS_per_vCPU,
+      MBPS_per_node: MBPS_per_vCPU * vCPUs_per_node,
+      RAM_per_node: RAM_per_vCPU * vCPUs_per_node,
+    },
+    Concurrency: {
+      Connections: vCPUs * Connections_per_vCPU,
+    }
+  }
+}
+
+// Just to wrapper functions to ensure we don't get errors from the pluralize
+// library.
+function plural(value: any) {
+  return pluralize.plural(value || "");
+}
+function singular(value: any) {
+  return pluralize.singular(value || "");
 }
 
 function pickBoxClass(node: NodeProps): string {
@@ -26,88 +104,21 @@ function pickBoxClass(node: NodeProps): string {
 
 class Node extends React.Component<NodeProps, {}> {
   render() {
-    let boxClassName = pickBoxClass(this.props);
-    let replicaClassName = this.props.replicas > 0 ? "Replicas-full" : "Replicas-empty";
-    return (
-      <div className={`${boxClassName}`}>
-        <div>Node {this.props.id}</div>
-        <div className={`${replicaClassName}`}>Replicas {this.props.replicas}</div>
-      </div>
-    );
-  }
-}
-
-interface AvailabilityZoneProps extends NodeProps {
-  nodes: Array<NodeProps>;
-}
-
-class AvailabilityZone extends React.Component<AvailabilityZoneProps, {}> {
-  render() {
-    let nodes = this.props.nodes.map((n) =>
+    const children = this.props.children.map((n) =>
       <Node {...n} />
     );
     let boxClassName = pickBoxClass(this.props);
     let replicaClassName = this.props.replicas > 0 ? "Replicas-full" : "Replicas-empty";
     return (
       <div className={`${boxClassName}`}>
-        <div>AZ {this.props.id}</div>
+        <div>{this.props.name} {this.props.id}</div>
         <div className={`${replicaClassName}`}>Replicas {this.props.replicas}</div>
-        {nodes}
-      </div>
-    );
-  }
-}
-
-interface DataCenterProps extends NodeProps {
-  availabilityZones: Array<AvailabilityZoneProps>;
-}
-
-class DataCenter extends React.Component<DataCenterProps, {}> {
-  render() {
-    let azs = this.props.availabilityZones.map((az) =>
-      <AvailabilityZone {...az} />
-    );
-    let boxClassName = pickBoxClass(this.props);
-    let replicaClassName = this.props.replicas > 0 ? "Replicas-full" : "Replicas-empty";
-    return (
-      <div className={`${boxClassName}`}>
-        <div>DC {this.props.id}</div>
-        <div className={`${replicaClassName}`}>Replicas {this.props.replicas}</div>
-        {azs}
-      </div>
-    );
-  }
-}
-
-interface RegionProps extends NodeProps {
-  datacenters: Array<DataCenterProps>;
-}
-
-class Region extends React.Component<RegionProps, {}> {
-  render() {
-    let dcs = this.props.datacenters.map((dc) =>
-      <DataCenter {...dc} />
-    );
-    let boxClassName = pickBoxClass(this.props);
-    let replicaClassName = this.props.replicas > 0 ? "Replicas-full" : "Replicas-empty";
-    return (
-      <div className={`${boxClassName}`}>
-        <div>Region {this.props.id}</div>
-        <div className={`${replicaClassName}`}>Replicas {this.props.replicas}</div>
-        <div className="App-container">
-          {dcs}
+        <div className={this.props.className}>
+          {children}
         </div>
       </div>
     );
   }
-}
-
-enum FailureMode {
-  None,
-  Region,
-  DataCenter,
-  AvailabilityZone,
-  Node,
 }
 
 function limit(num: number, min: number, max: number): number {
@@ -120,58 +131,95 @@ function limit(num: number, min: number, max: number): number {
   return num;
 }
 
-interface UserState {
-  numberRegions: number;
-  DCsPerRegion: number;
-  AZsPerDC: number;
-  NodesPerAZ: number;
+type UserState = {
+  levelCount: number;
+  names: Array<string>;
+  counts: Array<number>;
   replicationFactor: number;
-  failureMode: FailureMode;
+  failureMode: number;
+  vCPUs: number;
 }
 
-const defaultUserState: UserState = {
-  numberRegions: 1,
-  DCsPerRegion: 3,
-  AZsPerDC: 3,
-  NodesPerAZ: 3,
-  replicationFactor: 3,
-  failureMode: FailureMode.Region,
+function GetDefaultUserState(levelCount: number): UserState {
+  return {
+    levelCount: levelCount,
+    names: [...DefaultNamesByLevel[levelCount]],
+    counts: [...DefaultCountsByLevel[levelCount]],
+    replicationFactor: DefaultReplicationFactor,
+    failureMode: 1,
+    vCPUs: 4,
+  }
 }
 
 function populateSearch(state: UserState) {
-  let newSearch = qs.stringify(state);
-  let parsedURL = qs.parseUrl(window.location.href);
-  let oldSearch = qs.stringify(parsedURL.query);
+  const newSearch = qs.stringify(state, {arrayFormat: 'comma'});
+  const parsedURL = qs.parseUrl(window.location.href);
+  const oldSearch = qs.stringify(parsedURL.query, {arrayFormat: 'comma'});
   if (newSearch === oldSearch) {
     return
   }
-  let newURL = parsedURL.url + '?' + newSearch;
+  const newURL = parsedURL.url + '?' + newSearch;
   window.history.pushState(state, "CockroachDB Survival Tool", newURL);
 }
 
 function fixUserState(state: UserState): UserState {
-  state.numberRegions = limit(state.numberRegions, 1, 10);
-  state.DCsPerRegion = limit(state.DCsPerRegion, 1, 10);
-  state.AZsPerDC = limit(state.AZsPerDC, 1, 10);
-  state.NodesPerAZ = limit(state.NodesPerAZ, 1, 100);
+  state.levelCount = limit(state.levelCount, 1, MaxLevelCount);
+  const defaultUserState = GetDefaultUserState(state.levelCount);
+  for (let i = 0; i < state.levelCount; i++) {
+    state.names[i] = state.names[i] || defaultUserState.names[i];
+    state.counts[i] = limit(state.counts[i], 1, i === state.levelCount - 1 ? 100: 10);
+  }
+  if (state.names.length > state.levelCount) {
+    state.names = state.names.slice(0, state.levelCount)
+  }
+  if (state.counts.length > state.levelCount) {
+    state.counts = state.counts.slice(0, state.levelCount)
+  }
   if (state.replicationFactor % 2 === 0) {
     state.replicationFactor--;
   }
   state.replicationFactor = limit(state.replicationFactor, 1, 99);
+  state.failureMode = limit(state.failureMode, 0, state.levelCount);
+  state.vCPUs = limit(state.vCPUs, Min_vCPUs, Max_vCPUs);
+
   return state;
 }
 
 function fetchState(): UserState {
-  let userState = defaultUserState;
-  Object.entries(qs.parse(window.location.search)).forEach(
+  const defaultUserState = GetDefaultUserState(5);
+  let userState = GetDefaultUserState(5);
+  Object.entries(qs.parse(window.location.search, {arrayFormat: 'comma'})).forEach(
     ([key, value]) => {
       switch (key) {
-        case "numberRegions": userState.numberRegions = parseInt(value + "") || defaultUserState.numberRegions; break;
-        case "DCsPerRegion": userState.DCsPerRegion = parseInt(value + "") || defaultUserState.DCsPerRegion; break;
-        case "AZsPerDC": userState.AZsPerDC = parseInt(value + "") || defaultUserState.AZsPerDC; break;
-        case "NodesPerAZ": userState.NodesPerAZ = parseInt(value + "") || defaultUserState.NodesPerAZ; break;
+        case "counts":
+          if (value == null || !Array.isArray(value)) {
+            userState.counts = defaultUserState.counts;
+            break;
+          }
+          if (!Array.isArray(value)) {
+            userState.counts = defaultUserState.counts;
+            break;
+          }
+          let valueArray = value as Array<string>;
+          valueArray.forEach((v,i) => {
+            userState.counts[i] = parseInt(v + "") || defaultUserState.counts[i];
+          })
+          break;
+        case "names":
+          if (value == null || !Array.isArray(value)) {
+            userState.names = defaultUserState.names;
+            break;
+          }
+          if (!Array.isArray(value)) {
+            userState.names = defaultUserState.names;
+            break;
+          }
+          userState.names = value;
+          break;
         case "replicationFactor": userState.replicationFactor = parseInt(value + "") || defaultUserState.replicationFactor; break;
         case "failureMode": userState.failureMode = parseInt(value + "") || defaultUserState.failureMode; break;
+        case "levelCount": userState.levelCount = parseInt(value + "") || defaultUserState.levelCount; break;
+        case "vCPUS": userState.levelCount = parseInt(value + "") || defaultUserState.vCPUs; break;
       }
     }
   )
@@ -181,20 +229,19 @@ function fetchState(): UserState {
 
 interface MainFormState {
   userState: UserState;
-  failedRegions: number;
-  failedDCs: number;
-  failedAZs: number;
-  failedNodes: number;
+  failures: Array<number>;
   deadReplicas: number;
   allowableDead: number;
-  regions: Array<RegionProps>;
+  nodes: NodeProps;
+  nodeCount: number;
+  specs: Spec;
 }
 
 class MainForm extends React.Component<{}, MainFormState> {
   constructor(props: any) {
     super(props);
 
-    let userState = defaultUserState;
+    let userState = GetDefaultUserState(DefaultLevelCount);
     if (window.location.search.length === 0) {
       populateSearch(userState);
     } else {
@@ -203,21 +250,28 @@ class MainForm extends React.Component<{}, MainFormState> {
 
     this.state = {
       userState: userState,
-      failedRegions: 0,
-      failedDCs: 0,
-      failedAZs: 0,
-      failedNodes: 0,
+      failures: new Array(userState.levelCount).fill(0),
       deadReplicas: 0,
       allowableDead: 0,
-      regions: [],
+      nodes: {
+        key: "sentinel",
+        id: 0,
+        failed: false,
+        replicas: 0,
+        name: "sentinel",
+        children: [],
+        className: "sentinel",
+        depth: 0,
+      },
+      nodeCount: 0,
+      specs: calculateSpecs(0, 0, 0, 0),
     };
 
-    this.handleNumberRegionsChange = this.handleNumberRegionsChange.bind(this);
-    this.handleDCsPerRegionChange = this.handleDCsPerRegionChange.bind(this);
-    this.handleAZsPerDCChange = this.handleAZsPerDCChange.bind(this);
-    this.handleNodesPerAZChange = this.handleNodesPerAZChange.bind(this);
+    this.handleCountChange = this.handleCountChange.bind(this)
     this.handleReplicationFactorChange = this.handleReplicationFactorChange.bind(this);
     this.handleFailureModeChange = this.handleFailureModeChange.bind(this);
+    this.handleLevelsChange = this.handleLevelsChange.bind(this);
+    this.handlevCPUChange = this.handlevCPUChange.bind(this);
   }
 
   componentDidMount() {
@@ -237,41 +291,27 @@ class MainForm extends React.Component<{}, MainFormState> {
   getCurrentState(): MainFormState {
     return {
       userState: this.state.userState,
-      failedRegions: this.state.failedRegions,
-      failedDCs: this.state.failedDCs,
-      failedAZs: this.state.failedAZs,
-      failedNodes: this.state.failedNodes,
+      failures: this.state.failures,
       deadReplicas: this.state.deadReplicas,
       allowableDead: this.state.allowableDead,
-      regions: [],
+      nodes: this.state.nodes,
+      nodeCount: this.state.nodeCount,
+      specs: this.state.specs,
     };
   }
 
-  handleNumberRegionsChange(event: any) {
-    let value = parseInt(event.target.value) || defaultUserState.numberRegions;
+  handleCountChange(level: number, event: any) {
     let curState = this.getCurrentState();
-    curState.userState.numberRegions = value;
-    this.setState(this.update(curState));
-  }
-  handleDCsPerRegionChange(event: any) {
-    let value = parseInt(event.target.value) || defaultUserState.DCsPerRegion;
-    let curState = this.getCurrentState();
-    curState.userState.DCsPerRegion = value;
-    this.setState(this.update(curState));
-  }
-  handleAZsPerDCChange(event: any) {
-    let value = parseInt(event.target.value) || defaultUserState.AZsPerDC;
-    let curState = this.getCurrentState();
-    curState.userState.AZsPerDC = value;
-    this.setState(this.update(curState));
-  }
-  handleNodesPerAZChange(event: any) {
-    let value = parseInt(event.target.value) || defaultUserState.NodesPerAZ;
-    let curState = this.getCurrentState();
-    curState.userState.NodesPerAZ = value;
+    const defaultUserState = GetDefaultUserState(curState.userState.levelCount);
+    let value = parseInt(event.target.value);
+    // Allow 0, so it can be reset to 1, but don't allow undef or other weirdness.
+    value = value === 0 ? value : value || defaultUserState.counts[level];
+    curState.userState.counts[level] = value;
     this.setState(this.update(curState));
   }
   handleReplicationFactorChange(event: any) {
+    let curState = this.getCurrentState();
+    const defaultUserState = GetDefaultUserState(curState.userState.levelCount);
     let value = parseInt(event.target.value) || defaultUserState.replicationFactor;
     if (value % 2 === 0) {
       if (this.state.userState.replicationFactor > value) {
@@ -280,14 +320,142 @@ class MainForm extends React.Component<{}, MainFormState> {
         value++;
       }
     }
-    let curState = this.getCurrentState();
     curState.userState.replicationFactor = value;
     this.setState(this.update(curState), this.forceUpdate);
   }
   handleFailureModeChange(event: any) {
     let curState = this.getCurrentState();
-    curState.userState.failureMode = parseInt(event.target.value) || FailureMode.None;
+    curState.userState.failureMode = parseInt(event.target.value) || 0;
     this.setState(this.update(curState));
+  }
+  handleLevelsChange(event: any) {
+    let value = parseInt(event.target.value);
+    // Allow 0, so it can be reset to 1, but don't allow undef or other weirdness.
+    value = value === 0 ? value : value || DefaultLevelCount;
+    value = limit(value, 1,5)
+    let curState = this.getCurrentState();
+    // Adjust the other values accordingly.
+    if (curState.userState.levelCount > value) {
+      curState.userState.names.shift();
+      curState.userState.counts.shift();
+    } else if (curState.userState.levelCount < value) {
+      const defaultUserState = GetDefaultUserState(value);
+      curState.userState.names = defaultUserState.names;
+      curState.userState.counts.unshift(defaultUserState.counts[0]);
+    }
+    curState.userState.levelCount = value;
+    curState.failures = new Array(value).fill(0);
+    this.setState(this.update(curState));
+  }
+  handlevCPUChange(event: any) {
+    let curState = this.getCurrentState();
+    const defaultUserState = GetDefaultUserState(curState.userState.levelCount);
+    curState.userState.vCPUs = parseInt(event.target.value) || defaultUserState.vCPUs;
+    this.setState(this.update(curState));
+  }
+
+  // Create all the nodes and their children based on the topology of the system.
+  populateNodeChildren(node: NodeProps, state: UserState) {
+    for (let i = 0; i < state.counts[node.depth]; i++) {
+      const childKey = `${node.key}-${i+1}`;
+      let child: NodeProps = {
+        key: childKey,
+        id: i + 1,
+        failed: false,
+        replicas: 0,
+        name: singular(state.names[node.depth]),
+        children: [],
+        className: `level${node.depth+1}`,
+        depth: node.depth+1,
+      }
+      // Add children (recursively)
+      this.populateNodeChildren(child, state);
+      // Add the child to this node.
+      node.children.push(child);
+    }
+  }
+
+  // Adds the example range by distributing the replicas amongst the nodes.
+  addRange(node: NodeProps, numReplicas: number) {
+    // First calculate the number of replicas per child node.
+    const div = Math.floor(numReplicas / node.children.length);
+    const remainder = numReplicas % node.children.length;
+    let replicasPerChild = new Array(node.children.length).fill(div);
+    for (let i = 0; i < remainder; i++) {
+      replicasPerChild[i]++;
+    }
+    // Now populate them, recursively.
+    for (let i = 0; i < node.children.length; i++) {
+      if (replicasPerChild[i] > 0) {
+        this.addRange(node.children[i], replicasPerChild[i]);
+      } else {
+        // no more replicas to divvy out.
+        break;
+      }
+    }
+    node.replicas = numReplicas
+  }
+
+  // Mark all possible nodes as killed, limited by the failure mode level.
+  killReplicas(
+    node: NodeProps,
+    failureMode: number,
+    replicasToKill: number,
+    failures: Array<number>,
+    levels: number,
+  ): number {
+    if ((failureMode === 0) || (replicasToKill === 0) || (node.replicas === 0)) {
+      return 0;
+    }
+
+    // This is a super strange tree walk. It has to go level by level and then
+    // hit the first child of each parent.  We also need to skip any node that
+    // is lower than any skipped ones at that level.
+    interface tuple {
+      n: NodeProps;
+      i: number;
+    }
+    let queue: Array<tuple> = [{n: node, i: 0}];
+    let nextQueue: Array<tuple> = [];
+    let cur: tuple | undefined;
+    let remainingReplicas: number = replicasToKill;
+    let skippedLevelReplicaCount = 0;
+    while ((remainingReplicas > 0) ) {
+      if (queue.length === 0) {
+        if (nextQueue.length === 0) {
+          // We are done!
+          break;
+        }
+        queue = [...nextQueue];
+        nextQueue = [];
+        skippedLevelReplicaCount = 0;
+      }
+      cur = queue.shift();
+      if ((cur === undefined) || (cur.n.replicas === 0)) {
+        break;
+      }
+      // Get the child node we're going to be working with for now.
+      const child = cur.n.children[cur.i];
+      if (
+        (failureMode <= child.depth) &&
+        (child.replicas <= remainingReplicas) &&
+        (child.replicas >= skippedLevelReplicaCount)
+      ) {
+        // We can kill this whole cur node.
+        child.failed = true;
+        failures[child.depth]++;
+        remainingReplicas-=child.replicas;
+      } else if (child.children.length > 0) {
+        // Push the first child to the end of the queue.
+        nextQueue.push({n: child, i: 0});
+        skippedLevelReplicaCount = Math.max(skippedLevelReplicaCount, child.replicas);
+      }
+      // If there is another child, add it.
+      if (cur.i+1 < cur.n.children.length) {
+        queue.push({n: cur.n, i: cur.i+1})
+      }
+    }
+    return replicasToKill - remainingReplicas;
   }
 
   update(state: MainFormState): MainFormState {
@@ -297,307 +465,67 @@ class MainForm extends React.Component<{}, MainFormState> {
 
     // Spec out the whole system.
     state.allowableDead = Math.floor(state.userState.replicationFactor / 2);
+    state.nodeCount = state.userState.counts.reduce((a,b) => a * b, 1);
 
-    // Regions
-    state.regions = [];
-    for (let r = 0; r < state.userState.numberRegions; r++) {
-      let regionProps: RegionProps = {
-        key: "",
-        id: r + 1,
-        failed: false,
-        datacenters: [],
-        replicas: 0,
-      }
-
-      // Data Centers
-      for (let d = 0; d < state.userState.DCsPerRegion; d++) {
-        let dataCenterProps: DataCenterProps = {
-          key: "",
-          id: d + 1,
-          failed: false,
-          replicas: 0,
-          availabilityZones: [],
-        }
-
-        // Availability Zones
-        for (let a = 0; a < state.userState.AZsPerDC; a++) {
-          let availabilityZoneProps: AvailabilityZoneProps = {
-            key: "",
-            id: a + 1,
-            failed: false,
-            replicas: 0,
-            nodes: [],
-          }
-
-          // Nodes
-          for (let a = 0; a < state.userState.NodesPerAZ; a++) {
-            let nodeProps: NodeProps = {
-              key: "",
-              id: a + 1,
-              failed: false,
-              replicas: 0,
-            }
-            availabilityZoneProps.nodes.push(nodeProps);
-          }
-          dataCenterProps.availabilityZones.push(availabilityZoneProps);
-        }
-        regionProps.datacenters.push(dataCenterProps);
-      }
-      state.regions.push(regionProps);
+    // Pre-populate all levels, use a sentinel node to make the recursion easier.
+    state.nodes = {
+      key: "s",
+      id: 0,
+      failed: false,
+      replicas: 0,
+      name: "sentinel",
+      children: [],
+      className: "sentinel",
+      depth: 0,
     }
+    this.populateNodeChildren(state.nodes, state.userState);
 
-    // Add the example range.  This is not fun, there must be a better way.
-    // Replicas per region
-    for (let i = 0; i < state.userState.replicationFactor; i++) {
-      let region = i % state.userState.numberRegions;
-      state.regions[region].replicas++;
-    }
-    // Replicas per DC
-    state.regions.forEach(r => {
-      for (let i = 0; i < r.replicas; i++) {
-        let dc = i % state.userState.DCsPerRegion;
-        r.datacenters[dc].replicas++;
-      }
-    });
-    // Replicas per AZ
-    state.regions.forEach(r =>
-      r.datacenters.forEach(dc => {
-        for (let i = 0; i < dc.replicas; i++) {
-          let az = i % state.userState.AZsPerDC;
-          dc.availabilityZones[az].replicas++;
-        }
-      })
+    // Add the example range.
+    this.addRange(state.nodes, state.userState.replicationFactor)
+
+    state.failures = new Array(state.userState.levelCount+1).fill(0);
+    // Add in the dead replicas
+    state.deadReplicas = (state.nodeCount < state.userState.replicationFactor) ? 0 :
+      this.killReplicas(
+        state.nodes,
+        state.userState.failureMode,
+        state.allowableDead,
+        state.failures,
+        state.userState.levelCount,
+      );
+
+    // Remove the extra failure level.
+    state.failures.shift()
+
+    // Calculate the specs.
+    state.specs = calculateSpecs(
+      state.userState.vCPUs*state.nodeCount,
+      state.userState.replicationFactor,
+      state.userState.vCPUs,
+      state.nodeCount,
     );
-    // Replicas per Nodes
-    state.regions.forEach(r =>
-      r.datacenters.forEach(dc =>
-        dc.availabilityZones.forEach(az => {
-          // This is technically not needed, can't put more than one replica on a node.
-          for (let i = 0; i < az.replicas; i++) {
-            let n = i % state.userState.NodesPerAZ;
-            az.nodes[n].replicas++;
-          }
-        })
-      )
-    );
-
-    // Check for failures.
-    state.deadReplicas = 0;
-    state.failedRegions = 0;
-    state.failedDCs = 0;
-    state.failedAZs = 0;
-    state.failedNodes = 0;
-
-    // Regions
-    if (state.userState.failureMode === FailureMode.Region) {
-      for (let i = 0; i < state.userState.numberRegions; i++) {
-        if (state.regions[i].replicas === 0) {
-          // An empty region means that the range never wrapped and we know the
-          // rest of Regions or DCs will be empty.
-          break;
-        }
-        if (state.deadReplicas + state.regions[i].replicas <= state.allowableDead) {
-          state.regions[i].failed = true;
-          state.deadReplicas += state.regions[i].replicas;
-          state.failedRegions++;
-        } else {
-          // Don't continue here as these are traversed in order. This ensures
-          // we don't kill a region with less replicas. We want worst case
-          // scenario every time.
-          break;
-        }
-      }
-    }
-
-    // DCs
-    if (state.userState.failureMode > FailureMode.None &&
-      state.userState.failureMode <= FailureMode.DataCenter &&
-      state.deadReplicas < state.allowableDead) {
-      // Traverse the first DC in each region, then the second DC in each region ...
-      let i = -1;
-      let j = 0;
-      while (state.deadReplicas < state.allowableDead) {
-        i++;
-        if (i >= state.userState.numberRegions) {
-          i = 0;
-          j++;
-          if (j >= state.userState.DCsPerRegion) {
-            // We are at the end.
-            break;
-          }
-        }
-        if (state.regions[i].failed) {
-          // Skip all failed regions.
-          continue;
-        }
-        if ((state.regions[i].replicas === 0) ||
-          (state.regions[i].datacenters[j].replicas === 0)) {
-          // An empty region or datacenter means that the range never wrapped
-          // and we know the rest of Regions or DCs will be empty.
-          break;
-        }
-        if (state.deadReplicas + state.regions[i].datacenters[j].replicas <= state.allowableDead) {
-          state.regions[i].datacenters[j].failed = true;
-          state.deadReplicas += state.regions[i].datacenters[j].replicas;
-          state.failedDCs++;
-        } else {
-          // Don't continue here as these are traversed in order. This ensures
-          // we don't kill a DC with less replicas. We want worst case scenario
-          // every time.
-          break;
-        }
-      }
-    }
-
-    // AZs
-    if (state.userState.failureMode > FailureMode.None &&
-      state.userState.failureMode <= FailureMode.AvailabilityZone &&
-      state.deadReplicas < state.allowableDead) {
-      // Traversal order for a 3x3x3: (Region-DC-AZ)
-      // 1-1-1, 2-1-1, 3-1-1,
-      // 1-2-1, 2-2-1, 3-2-1,
-      // 1-3-1, 2-3-1, 3-3-1,
-      // 1-1-2, 2-1-2, 3-1-2,
-      // 1-2-2, 2-2-2, 3-2-2,
-      // 1-3-2, 2-3-2, 3-3-2,
-      // 1-1-3, 2-1-3, 3-1-3,
-      // 1-2-3, 2-2-3, 3-2-3,
-      // 1-3-3, 2-3-3, 3-3-3,
-      let i = -1;
-      let j = 0;
-      let k = 0;
-      while (state.deadReplicas < state.allowableDead) {
-        i++;
-        if (i >= state.userState.numberRegions) {
-          i = 0;
-          j++;
-          if (j >= state.userState.DCsPerRegion) {
-            j = 0;
-            k++;
-            if (k >= state.userState.AZsPerDC) {
-              // We are at the end.
-              break;
-            }
-          }
-        }
-        if (state.regions[i].failed ||
-          state.regions[i].datacenters[j].failed) {
-          // Skip all failed regions and datacenters.
-          continue;
-        }
-        if ((state.regions[i].replicas === 0) ||
-          (state.regions[i].datacenters[j].replicas === 0) ||
-          (state.regions[i].datacenters[j].availabilityZones[k].replicas === 0)) {
-          // An empty region, DC or AZ means that the range never wrapped
-          // and we know the rest of Regions, DCs or AZs will be empty.
-          break;
-        }
-
-        if (state.deadReplicas + state.regions[i].datacenters[j].availabilityZones[k].replicas <= state.allowableDead) {
-          state.regions[i].datacenters[j].availabilityZones[k].failed = true;
-          state.deadReplicas += state.regions[i].datacenters[j].availabilityZones[k].replicas;
-          state.failedAZs++;
-        } else {
-          // Don't continue here as these are traversed in order. This ensures
-          // we don't kill a AZ with less replicas. We want worst case scenario
-          // every time.
-          break;
-        }
-      }
-    }
-
-    // Nodes
-    if (state.userState.failureMode > FailureMode.None &&
-      state.userState.failureMode <= FailureMode.Node &&
-      state.deadReplicas < state.allowableDead) {
-      // Traversal order for a 2x2x2x2: (Region-DC-AZ-Nodes)
-      // 1-1-1-1, 2-1-1-1,
-      // 1-2-1-1, 2-2-1-1,
-      // 1-1-2-1, 2-1-2-1,
-      // 1-2-2-1, 2-2-2-1,
-      // 1-1-1-2, 2-1-1-2,
-      // 1-2-1-2, 2-2-1-2,
-      // 1-1-2-2, 2-1-2-2,
-      // 1-2-2-2, 2-2-2-2,
-
-      let i = -1;
-      let j = 0;
-      let k = 0;
-      let l = 0;
-      while (state.deadReplicas < state.allowableDead) {
-        i++;
-        if (i >= state.userState.numberRegions) {
-          i = 0;
-          j++;
-          if (j >= state.userState.DCsPerRegion) {
-            j = 0;
-            k++;
-            if (k >= state.userState.AZsPerDC) {
-              k = 0;
-              l++;
-              if (l >= state.userState.NodesPerAZ) {
-                // We are at the end.
-                break;
-              }
-            }
-          }
-        }
-        if (state.regions[i].failed ||
-          state.regions[i].datacenters[j].failed ||
-          state.regions[i].datacenters[j].availabilityZones[k].failed
-        ) {
-          // Skip all failed regions, DCs and AZs.
-          continue;
-        }
-        if ((state.regions[i].replicas === 0) ||
-          (state.regions[i].datacenters[j].replicas === 0) ||
-          (state.regions[i].datacenters[j].availabilityZones[k].replicas === 0) ||
-          (state.regions[i].datacenters[j].availabilityZones[k].nodes[l].replicas === 0)) {
-          // An empty region, DC, AZ or node means that the range never wrapped
-          // and we know the rest of Regions, DCs, AZs or nodes will be empty.
-          break;
-        }
-
-        if (state.deadReplicas + state.regions[i].datacenters[j].availabilityZones[k].nodes[l].replicas <= state.allowableDead) {
-          state.regions[i].datacenters[j].availabilityZones[k].nodes[l].failed = true;
-          state.deadReplicas += state.regions[i].datacenters[j].availabilityZones[k].nodes[l].replicas;
-          state.failedNodes++;
-        } else {
-          // Don't continue here as these are traversed in order. This ensures
-          // we don't kill a node with less replicas. We want worst case
-          // scenario every time.
-          // Since nodes should only ever have one replica, this only matters
-          // when the cluster underreplicated.
-          break;
-        }
-      }
-    }
-
-    // Add all the keys.
-    state.regions.forEach(r => {
-      r.key = generateKey(r);
-      r.datacenters.forEach(dc => {
-        dc.key = generateKey(dc);
-        dc.availabilityZones.forEach(az => {
-          az.key = generateKey(az);
-          az.nodes.forEach(n => {
-            n.key = generateKey(n);
-          });
-        });
-      });
-    });
 
     return state;
   }
 
   render() {
-    let regions = this.state.regions.map((r) =>
-      <Region {...r} />
-    );
-    let nodeCount = this.state.userState.numberRegions *
-      this.state.userState.DCsPerRegion *
-      this.state.userState.AZsPerDC *
-      this.state.userState.NodesPerAZ;
+    const nodeName = this.state.userState.names[this.state.userState.names.length-1];
+    let failureDisplay: Array<string> = Array(this.state.failures.length);
+    let foundValue = false;
+    this.state.failures.forEach((f,i) => {
+      if (i < this.state.userState.failureMode-1) {
+        failureDisplay[i] = "Ignore";
+      } else {
+        if (foundValue) {
+          failureDisplay[i] = "Display";
+        } else if (f === 0) {
+          failureDisplay[i] = "Warning";
+        } else {
+          failureDisplay[i] = "Display";
+          foundValue = true;
+        }
+      }
+    });
     return (
       <div>
         <div className="App-form">
@@ -605,100 +533,165 @@ class MainForm extends React.Component<{}, MainFormState> {
             <table className="App-table">
               <thead>
                 <tr>
-                  <th>Regions</th>
-                  <th>DCs per Region</th>
-                  <th>AZs per DC</th>
-                  <th>Nodes per AZ</th>
+                  {
+                    this.state.userState.names.map((name, i) => {
+                      return <th key={`title-${name}-${i}`}>{plural(name)}</th>;
+                    })
+                  }
                   <th>Replication Factor</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td>
-                    <input className="App-input" type="number" value={this.state.userState.numberRegions} onChange={this.handleNumberRegionsChange} />
-                  </td>
-                  <td>
-                    <input className="App-input" name="DCsPerRegion" type="number" value={this.state.userState.DCsPerRegion} onChange={this.handleDCsPerRegionChange} />
-                  </td>
-                  <td>
-                    <input className="App-input" name="AZsPerDC" type="number" value={this.state.userState.AZsPerDC} onChange={this.handleAZsPerDCChange} />
-                  </td>
-                  <td>
-                    <input className="App-input" name="NodesPerAZ" type="number" value={this.state.userState.NodesPerAZ} onChange={this.handleNodesPerAZChange} />
-                  </td>
+                  {
+                    this.state.userState.names.map((name, i) =>
+                      <td key={`input-${name}-${i}`}>
+                        <input className="App-input"
+                          type="number"
+                          name={name}
+                          value={this.state.userState.counts[i]}
+                          onChange={(e) => this.handleCountChange(i, e)} />
+                      </td>
+                    )
+                  }
                   <td>
                     <input className="App-input" name="replicationFactor" type="number" value={this.state.userState.replicationFactor} onChange={this.handleReplicationFactorChange} />
                   </td>
                 </tr>
               </tbody>
             </table>
-            <div className="FailureMode">
+            <div className="Selector">
               <div>Failure Mode:</div>
               <select className="FailureSelect" value={this.state.userState.failureMode} onChange={this.handleFailureModeChange}>
-                <option value={FailureMode.None}>None</option>
-                <option value={FailureMode.Region}>Region</option>
-                <option value={FailureMode.DataCenter}>DataCenter</option>
-                <option value={FailureMode.AvailabilityZone}>AvailabilityZone</option>
-                <option value={FailureMode.Node}>Node</option>
+                <option value={0}>None</option>
+                {
+                  this.state.userState.names.map((n,i) =>
+                    <option value={i+1} key={`failureMode-${n}-${i}`}>{singular(n)}</option>
+                  )
+                }
               </select>
             </div>
           </form>
         </div>
         {
-          nodeCount < this.state.userState.replicationFactor && <div className="Underreplicated">
-            The system is underreplicated: There are {nodeCount} nodes, but {this.state.userState.replicationFactor} are needed.
-            </div>
+          this.state.nodeCount < this.state.userState.replicationFactor && <div className="Underreplicated">
+            The system is underreplicated: There are {this.state.nodeCount} nodes, but {this.state.userState.replicationFactor} are needed.
+          </div>
         }
         {
-          this.state.userState.failureMode !== FailureMode.None && <div className="FailureResults">
+          this.state.userState.failureMode !== 0 && <div className="FailureResults">
             <div>With {this.state.userState.replicationFactor}x replication you can survive a max of {this.state.allowableDead} dead replica{this.state.allowableDead !== 1 && "s"}.</div>
             <div>This scenario will survive losing at most:</div>
             <div className="FailureTable">
-              {!!this.state.failedRegions &&
-                <div className="FailureRow">
-                  <div className="FailureColumn">
-                    <div className="FailureHeader">Regions</div>
+              {
+                this.state.failures.map((v, i) => {
+                  if (failureDisplay[i] === "Ignore") {
+                    return false;
+                  }
+                  return <div className="FailureRow" key={`failureRow-${v}-${i}`}>
+                    <div className="FailureColumn">
+                      <div className={`FailureHeader${failureDisplay[i]}`}>{plural(this.state.userState.names[i])}</div>
+                    </div>
+                    <div className="FailureColumn">
+                      <div className={`FailureValue${failureDisplay[i]}`}>{this.state.failures[i]}</div>
+                    </div>
                   </div>
-                  <div className="FailureColumn">
-                    <div className="FailureValue">{this.state.failedRegions}</div>
-                  </div>
-                </div>
+                })
               }
-              {!!(this.state.failedRegions || this.state.failedDCs) &&
-                <div className="FailureRow">
-                  <div className="FailureColumn">
-                    <div className="FailureHeader">Data Centers</div>
-                  </div>
-                  <div className="FailureColumn">
-                    <div className="FailureValue">{this.state.failedDCs}</div>
-                  </div>
-                </div>
-              }
-              {!!(this.state.failedRegions || this.state.failedDCs || this.state.failedAZs) &&
-                <div className="FailureRow">
-                  <div className="FailureColumn">
-                    <div className="FailureHeader">Availability Zones</div>
-                  </div>
-                  <div className="FailureColumn">
-                    <div className="FailureValue">{this.state.failedAZs}</div>
-                  </div>
-                </div>
-              }
-              <div className="FailureRow">
-                <div className="FailureColumn">
-                  <div className="FailureHeader">Nodes</div>
-                </div>
-                <div className="FailureColumn">
-                  <div className="FailureValue">{this.state.failedNodes}</div>
-                </div>
-              </div>
             </div>
           </div>
         }
         <div className="App-container">
-          {regions}
+          {
+            this.state.nodes.children.map((r) =>
+              <Node {...r} />
+            )
+          }
         </div>
-      </div >
+        <form>
+          <div className="Selector">
+            <div>Number of Levels:</div>
+            <input className="App-input"
+               type="number"
+               name="levels"
+               value={this.state.userState.levelCount}
+               onChange={this.handleLevelsChange} />
+          </div>
+        </form>
+        <form>
+          <div className="Footer">
+            <h2>Sizing Calculations</h2>
+            <div className="Selector">
+              <div>{`vCPUs per ${singular(nodeName)}`}</div>
+              <input className="App-input"
+                type="number"
+                name="vCPUs"
+                value={this.state.userState.vCPUs}
+                onChange={this.handlevCPUChange} />
+            </div>
+            <div className="SizingResults">
+            <div>
+                With this setup, there are {this.state.nodeCount} {plural(nodeName)} and {this.state.nodeCount*this.state.userState.vCPUs} vCPUs.
+              </div>
+              <div>Some rule of thumb sizing calculations allow for:</div>
+              <div className="SizingTable">
+                <div className="SizingRpw">
+                  <div className="SizingColumn">
+                    <div className="SizingValue">
+                      {xbytes(this.state.specs.Storage.Capacity, {iec: true})} ({xbytes(this.state.specs.Storage.Capacity, {iec: false})}) total storage, {xbytes(this.state.specs.Storage.CapacityPerNode, {iec: true})} ({xbytes(this.state.specs.Storage.CapacityPerNode, {iec: false})}) storage per {singular(nodeName)}
+                    </div>
+                  </div>
+                </div>
+                <div className="SizingRpw">
+                  <div className="SizingColumn">
+                    <div className="SizingValue">
+                      {xbytes(this.state.specs.Storage.RealCapacity, {iec: true})} ({xbytes(this.state.specs.Storage.RealCapacity, {iec: false})}) actual storage (due to {this.state.userState.replicationFactor}x replication)
+                    </div>
+                  </div>
+                </div>
+                <div className="SizingRpw">
+                  <div className="SizingColumn">
+                    <div className="SizingValue">
+                      {this.state.specs.Storage.IOPS} IOPS total, {this.state.specs.Storage.IOPS_per_node} IOPS per {singular(nodeName)}
+                    </div>
+                  </div>
+                </div>
+                <div className="SizingRpw">
+                  <div className="SizingColumn">
+                    <div className="SizingValue">
+                      {this.state.specs.Storage.MBPS} MBPS total, {this.state.specs.Storage.MBPS_per_node} MBPS per {singular(nodeName)}
+                    </div>
+                  </div>
+                </div>
+                <div className="SizingRpw">
+                  <div className="SizingColumn">
+                    <div className="SizingValue">
+                      {xbytes(this.state.specs.Storage.RAM_per_node, {iec: true})} RAM per {singular(nodeName)} recommended
+                    </div>
+                  </div>
+                </div>
+                <div className="SizingRpw">
+                  <div className="SizingColumn">
+                    <div className="SizingValue">{this.state.specs.Concurrency.Connections} concurrent <i>active</i> connections</div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <i>
+                  *Please note that these values are rough approximations based on some back of the envelope calculations.
+                </i>
+              </div>
+              <div>
+                <i>
+                  <b>
+                    Contact Cockroach Labs for a more complete and accurate sizing calculation.
+                  </b>
+                </i>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
     );
   }
 }
