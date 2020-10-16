@@ -205,3 +205,12 @@
     .SizingValue {
         text-align: center;
     }
+    
+    .NameInput {
+        text-align: center;
+        color: white;
+        background-color: #282c34;
+        border: none;
+        font-size: medium;
+        font-weight: bold;
+    }
