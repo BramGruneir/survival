@@ -15,6 +15,7 @@ const Bytes_per_vCPU = xbytes.parseBytes("150 GB").bytes;
 const IOPS_per_vCPU = 500;
 const MBPS_per_vCPU = 30;
 const Connections_per_vCPU = 4;
+const RAM_per_vCPU = xbytes.parseBytes("4 GiB").bytes;
 
 const DefaultNamesByLevel: { [count: number]: Array<string> } = {
   1: ["Nodes"],
@@ -52,22 +53,29 @@ interface Spec {
     IOPS_per_node: number,
     MBPS: number,
     MBPS_per_node: number,
+    RAM_per_node: number,
   },
   Concurrency: {
     Connections: number,
   }
 }
 
-function calculateSpecs(vCPUs: number, replicationFactor: number, vCPUs_per_node: number): Spec {
+function calculateSpecs(
+  vCPUs: number,
+  replicationFactor: number,
+  vCPUs_per_node: number,
+  nodeCount: number,
+  ): Spec {
   return {
     Storage: {
       Capacity: vCPUs * Bytes_per_vCPU,
-      CapacityPerNode: vCPUs * Bytes_per_vCPU / vCPUs_per_node,
+      CapacityPerNode: vCPUs * Bytes_per_vCPU / nodeCount,
       RealCapacity: vCPUs * Bytes_per_vCPU / replicationFactor,
       IOPS: vCPUs * IOPS_per_vCPU,
-      IOPS_per_node: IOPS_per_vCPU*vCPUs_per_node,
+      IOPS_per_node: IOPS_per_vCPU * vCPUs_per_node,
       MBPS: vCPUs * MBPS_per_vCPU,
-      MBPS_per_node: MBPS_per_vCPU*vCPUs_per_node,
+      MBPS_per_node: MBPS_per_vCPU * vCPUs_per_node,
+      RAM_per_node: RAM_per_vCPU * vCPUs_per_node,
     },
     Concurrency: {
       Connections: vCPUs * Connections_per_vCPU,
@@ -256,7 +264,7 @@ class MainForm extends React.Component<{}, MainFormState> {
         depth: 0,
       },
       nodeCount: 0,
-      specs: calculateSpecs(0, 0, 0),
+      specs: calculateSpecs(0, 0, 0, 0),
     };
 
     this.handleCountChange = this.handleCountChange.bind(this)
@@ -493,6 +501,7 @@ class MainForm extends React.Component<{}, MainFormState> {
     state.specs = calculateSpecs(
       state.userState.vCPUs*state.nodeCount,
       state.userState.replicationFactor,
+      state.userState.vCPUs,
       state.nodeCount,
     );
 
@@ -611,6 +620,7 @@ class MainForm extends React.Component<{}, MainFormState> {
         </form>
         <form>
           <div className="Footer">
+            <h2>Sizing Calculations</h2>
             <div className="Selector">
               <div>{`vCPUs per ${singular(nodeName)}`}</div>
               <input className="App-input"
@@ -628,14 +638,14 @@ class MainForm extends React.Component<{}, MainFormState> {
                 <div className="SizingRpw">
                   <div className="SizingColumn">
                     <div className="SizingValue">
-                      {xbytes(this.state.specs.Storage.Capacity, {iec: true})} total storage, {xbytes(this.state.specs.Storage.CapacityPerNode, {iec: true})} storage per {singular(nodeName)}
+                      {xbytes(this.state.specs.Storage.Capacity, {iec: true})} ({xbytes(this.state.specs.Storage.Capacity, {iec: false})}) total storage, {xbytes(this.state.specs.Storage.CapacityPerNode, {iec: true})} ({xbytes(this.state.specs.Storage.CapacityPerNode, {iec: false})}) storage per {singular(nodeName)}
                     </div>
                   </div>
                 </div>
                 <div className="SizingRpw">
                   <div className="SizingColumn">
                     <div className="SizingValue">
-                      {xbytes(this.state.specs.Storage.RealCapacity, {iec: true})} actual storage (due to {this.state.userState.replicationFactor}x replication)
+                      {xbytes(this.state.specs.Storage.RealCapacity, {iec: true})} ({xbytes(this.state.specs.Storage.RealCapacity, {iec: false})}) actual storage (due to {this.state.userState.replicationFactor}x replication)
                     </div>
                   </div>
                 </div>
@@ -648,8 +658,15 @@ class MainForm extends React.Component<{}, MainFormState> {
                 </div>
                 <div className="SizingRpw">
                   <div className="SizingColumn">
-                  <div className="SizingValue">
+                    <div className="SizingValue">
                       {this.state.specs.Storage.MBPS} MBPS total, {this.state.specs.Storage.MBPS_per_node} MBPS per {singular(nodeName)}
+                    </div>
+                  </div>
+                </div>
+                <div className="SizingRpw">
+                  <div className="SizingColumn">
+                    <div className="SizingValue">
+                      {xbytes(this.state.specs.Storage.RAM_per_node, {iec: true})} RAM per {singular(nodeName)} recommended
                     </div>
                   </div>
                 </div>
