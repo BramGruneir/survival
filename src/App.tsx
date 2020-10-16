@@ -46,6 +46,7 @@ interface NodeProps {
 interface Spec {
   Storage: {
     Capacity: number,
+    CapacityPerNode: number,
     RealCapacity: number,
     IOPS: number,
     IOPS_per_node: number,
@@ -61,6 +62,7 @@ function calculateSpecs(vCPUs: number, replicationFactor: number, vCPUs_per_node
   return {
     Storage: {
       Capacity: vCPUs * Bytes_per_vCPU,
+      CapacityPerNode: vCPUs * Bytes_per_vCPU / vCPUs_per_node,
       RealCapacity: vCPUs * Bytes_per_vCPU / replicationFactor,
       IOPS: vCPUs * IOPS_per_vCPU,
       IOPS_per_node: IOPS_per_vCPU*vCPUs_per_node,
@@ -625,12 +627,16 @@ class MainForm extends React.Component<{}, MainFormState> {
               <div className="SizingTable">
                 <div className="SizingRpw">
                   <div className="SizingColumn">
-                    <div className="SizingValue">{xbytes(this.state.specs.Storage.Capacity, {iec: true})} total storage</div>
+                    <div className="SizingValue">
+                      {xbytes(this.state.specs.Storage.Capacity, {iec: true})} total storage, {xbytes(this.state.specs.Storage.CapacityPerNode, {iec: true})} storage per {singular(nodeName)}
+                    </div>
                   </div>
                 </div>
                 <div className="SizingRpw">
                   <div className="SizingColumn">
-                    <div className="SizingValue">{xbytes(this.state.specs.Storage.RealCapacity, {iec: true})} actual storage (due to {this.state.userState.replicationFactor}x replication)</div>
+                    <div className="SizingValue">
+                      {xbytes(this.state.specs.Storage.RealCapacity, {iec: true})} actual storage (due to {this.state.userState.replicationFactor}x replication)
+                    </div>
                   </div>
                 </div>
                 <div className="SizingRpw">
