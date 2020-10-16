@@ -694,11 +694,9 @@ class MainForm extends React.Component<{}, MainFormState> {
                 </i>
               </div>
               <div>
-                <i>
-                  <b>
-                    Contact Cockroach Labs for a more complete and accurate sizing calculation.
-                  </b>
-                </i>
+                <a className="Contact" href="mailto:sales@cockroachlabs.com">
+                  Contact Cockroach Labs for a more complete and accurate sizing calculation.
+                </a>
               </div>
             </div>
           </div>
