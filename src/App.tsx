@@ -2,17 +2,26 @@ import React from 'react';
 import './App.css';
 import qs from "query-string";
 import pluralize from "pluralize";
+import xbytes from 'xbytes';
+
 
 const MaxLevelCount = 5;
 const DefaultLevelCount = 3;
 const DefaultReplicationFactor = 3;
+const Max_vCPUs = 256;
+const Min_vCPUs= 2;
+
+const Bytes_per_vCPU = xbytes.parseBytes("150 GB").bytes;
+const IOPS_per_vCPU = 500;
+const MBPS_per_vCPU = 30;
+const Connections_per_vCPU = 4;
 
 const DefaultNamesByLevel: { [count: number]: Array<string> } = {
   1: ["Nodes"],
   2: ["Data Centers", "Nodes"],
-  3: ["Data Centers", "Availability Zones", "Nodes"],
+  3: ["Regions", "Availability Zones", "Nodes"],
   4: ["Regions","Data Centers","Availability Zones","Nodes"],
-  5: ["Regions","Countries", "Data Centers","Availability Zones","Nodes"],
+  5: ["Regions","Data Centers","Availability Zones","Racks","Nodes"],
 };
 
 const DefaultCountsByLevel: { [count: number]: Array<number> } = {
@@ -32,6 +41,34 @@ interface NodeProps {
   children: Array<NodeProps>;
   className: string;
   depth: number;
+}
+
+interface Spec {
+  Storage: {
+    Capacity: number,
+    RealCapacity: number,
+    IOPS: number,
+    MBPS: number,
+  },
+  Concurrency: {
+    Connections: number,
+  }
+}
+
+
+
+function calculateSpecs(vCPUs: number, replicationFactor: number): Spec {
+  return {
+    Storage: {
+      Capacity: vCPUs * Bytes_per_vCPU,
+      RealCapacity: vCPUs * Bytes_per_vCPU / replicationFactor,
+      IOPS: vCPUs * IOPS_per_vCPU,
+      MBPS: vCPUs * MBPS_per_vCPU,
+    },
+    Concurrency: {
+      Connections: vCPUs * Connections_per_vCPU,
+    }
+  }
 }
 
 // Just to wrapper functions to ensure we don't get errors from the pluralize
@@ -88,6 +125,7 @@ type UserState = {
   counts: Array<number>;
   replicationFactor: number;
   failureMode: number;
+  vCPUs: number;
 }
 
 function GetDefaultUserState(levelCount: number): UserState {
@@ -97,6 +135,7 @@ function GetDefaultUserState(levelCount: number): UserState {
     counts: [...DefaultCountsByLevel[levelCount]],
     replicationFactor: DefaultReplicationFactor,
     failureMode: 1,
+    vCPUs: 4,
   }
 }
 
@@ -129,6 +168,7 @@ function fixUserState(state: UserState): UserState {
   }
   state.replicationFactor = limit(state.replicationFactor, 1, 99);
   state.failureMode = limit(state.failureMode, 0, state.levelCount);
+  state.vCPUs = limit(state.vCPUs, Min_vCPUs, Max_vCPUs);
 
   return state;
 }
@@ -167,6 +207,7 @@ function fetchState(): UserState {
         case "replicationFactor": userState.replicationFactor = parseInt(value + "") || defaultUserState.replicationFactor; break;
         case "failureMode": userState.failureMode = parseInt(value + "") || defaultUserState.failureMode; break;
         case "levelCount": userState.levelCount = parseInt(value + "") || defaultUserState.levelCount; break;
+        case "vCPUS": userState.levelCount = parseInt(value + "") || defaultUserState.vCPUs; break;
       }
     }
   )
@@ -181,6 +222,7 @@ interface MainFormState {
   allowableDead: number;
   nodes: NodeProps;
   nodeCount: number;
+  specs: Spec;
 }
 
 class MainForm extends React.Component<{}, MainFormState> {
@@ -210,12 +252,14 @@ class MainForm extends React.Component<{}, MainFormState> {
         depth: 0,
       },
       nodeCount: 0,
+      specs: calculateSpecs(0, 0),
     };
 
     this.handleCountChange = this.handleCountChange.bind(this)
     this.handleReplicationFactorChange = this.handleReplicationFactorChange.bind(this);
     this.handleFailureModeChange = this.handleFailureModeChange.bind(this);
     this.handleLevelsChange = this.handleLevelsChange.bind(this);
+    this.handlevCPUChange = this.handlevCPUChange.bind(this);
   }
 
   componentDidMount() {
@@ -240,6 +284,7 @@ class MainForm extends React.Component<{}, MainFormState> {
       allowableDead: this.state.allowableDead,
       nodes: this.state.nodes,
       nodeCount: this.state.nodeCount,
+      specs: this.state.specs,
     };
   }
 
@@ -288,6 +333,12 @@ class MainForm extends React.Component<{}, MainFormState> {
     }
     curState.userState.levelCount = value;
     curState.failures = new Array(value).fill(0);
+    this.setState(this.update(curState));
+  }
+  handlevCPUChange(event: any) {
+    let curState = this.getCurrentState();
+    const defaultUserState = GetDefaultUserState(curState.userState.levelCount);
+    curState.userState.vCPUs = parseInt(event.target.value) || defaultUserState.vCPUs;
     this.setState(this.update(curState));
   }
 
@@ -434,10 +485,14 @@ class MainForm extends React.Component<{}, MainFormState> {
     // Remove the extra failure level.
     state.failures.shift()
 
+    // Calculate the specs.
+    state.specs = calculateSpecs(state.userState.vCPUs*state.nodeCount, state.userState.replicationFactor);
+
     return state;
   }
 
   render() {
+    const nodeName = this.state.userState.names[this.state.userState.names.length-1];
     return (
       <div>
         <div className="App-form">
@@ -472,7 +527,7 @@ class MainForm extends React.Component<{}, MainFormState> {
                 </tr>
               </tbody>
             </table>
-            <div className="FailureMode">
+            <div className="Selector">
               <div>Failure Mode:</div>
               <select className="FailureSelect" value={this.state.userState.failureMode} onChange={this.handleFailureModeChange}>
                 <option value={0}>None</option>
@@ -520,19 +575,72 @@ class MainForm extends React.Component<{}, MainFormState> {
             )
           }
         </div>
-        <div className="App-form">
-          <form>
-            <div className="FailureMode">
-              <div>Number of Levels:</div>
+        <form>
+          <div className="Selector">
+            <div>Number of Levels:</div>
+            <input className="App-input"
+               type="number"
+               name="levels"
+               value={this.state.userState.levelCount}
+               onChange={this.handleLevelsChange} />
+          </div>
+        </form>
+        <form>
+          <div className="Footer">
+            <div className="Selector">
+              <div>{`vCPUs per ${singular(nodeName)}`}</div>
               <input className="App-input"
-                          type="number"
-                          name="levels"
-                          value={this.state.userState.levelCount}
-                          onChange={this.handleLevelsChange} />
+                type="number"
+                name="vCPUs"
+                value={this.state.userState.vCPUs}
+                onChange={this.handlevCPUChange} />
             </div>
-          </form>
-        </div>
-      </div >
+            <div className="SizingResults">
+            <div>
+                With this setup, there are {this.state.nodeCount} {plural(nodeName)} and {this.state.nodeCount*this.state.userState.vCPUs} vCPUs.
+              </div>
+              <div>Some rule of thumb sizing calculations allow for:</div>
+              <div className="SizingTable">
+                <div className="SizingRpw">
+                  <div className="SizingColumn">
+                    <div className="SizingValue">{xbytes(this.state.specs.Storage.Capacity, {iec: true})} total storage</div>
+                  </div>
+                </div>
+                <div className="SizingRpw">
+                  <div className="SizingColumn">
+                    <div className="SizingValue">{xbytes(this.state.specs.Storage.RealCapacity, {iec: true})} actual storage (due to the replication factor)</div>
+                  </div>
+                </div>
+                <div className="SizingRpw">
+                  <div className="SizingColumn">
+                    <div className="SizingValue">{this.state.specs.Storage.IOPS} IOPS</div>
+                  </div>
+                </div>
+                <div className="SizingRpw">
+                  <div className="SizingColumn">
+                    <div className="SizingValue">{this.state.specs.Storage.MBPS} MBPS</div>
+                  </div>
+                </div>
+                <div className="SizingRpw">
+                  <div className="SizingColumn">
+                    <div className="SizingValue">{this.state.specs.Concurrency.Connections} concurrent <i>active</i> connections</div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <i>
+                  *Please note that these values are rough approximations for some back of the envelope calculations only.
+                </i>
+              </div>
+              <div>
+                <i>
+                  Contact Cockroach Labs for a more complete and accurate sizing calculation.
+                </i>
+              </div>
+              </div>
+            </div>
+        </form>
+      </div>
     );
   }
 }

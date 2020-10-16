@@ -155,3 +155,43 @@
     .FailureValue {
         text-align: left;
     }
+    
+    .Selector {
+        font-size: x-large;
+        text-align: center;
+    }
+    
+    .Footer {
+        padding: 40px;
+    }
+    
+    .SizingResults {
+        font-size: x-large;
+        color: yellow;
+        margin: 20px;
+        text-align: center;
+    }
+    
+    .SizingTable {
+        padding: 20px;
+    }
+    
+    .SizingRow {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        width: 100%;
+    }
+    
+    .SizingColumn {
+        display: flex;
+        flex-direction: column;
+        flex-basis: 100%;
+        flex: 1;
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    
+    .SizingValue {
+        text-align: center;
+    }
