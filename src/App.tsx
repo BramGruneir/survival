@@ -55,8 +55,6 @@ interface Spec {
   }
 }
 
-
-
 function calculateSpecs(vCPUs: number, replicationFactor: number): Spec {
   return {
     Storage: {
@@ -493,6 +491,22 @@ class MainForm extends React.Component<{}, MainFormState> {
 
   render() {
     const nodeName = this.state.userState.names[this.state.userState.names.length-1];
+    let failureDisplay: Array<string> = Array(this.state.failures.length);
+    let foundValue = false;
+    this.state.failures.forEach((f,i) => {
+      if (i < this.state.userState.failureMode-1) {
+        failureDisplay[i] = "Ignore";
+      } else {
+        if (foundValue) {
+          failureDisplay[i] = "Display";
+        } else if (f === 0) {
+          failureDisplay[i] = "Warning";
+        } else {
+          failureDisplay[i] = "Display";
+          foundValue = true;
+        }
+      }
+    });
     return (
       <div>
         <div className="App-form">
@@ -551,18 +565,18 @@ class MainForm extends React.Component<{}, MainFormState> {
             <div>This scenario will survive losing at most:</div>
             <div className="FailureTable">
               {
-                this.state.failures.map((v,i) => {
-                  if ((i === this.state.failures.length-1) || (this.state.failures.slice(0,i+1).some(v => v > 0))) {
-                    return <div className="FailureRow" key={`failureRow-${v}-${i}`}>
-                      <div className="FailureColumn">
-                        <div className="FailureHeader">{plural(this.state.userState.names[i])}</div>
-                      </div>
-                      <div className="FailureColumn">
-                        <div className="FailureValue">{this.state.failures[i]}</div>
-                      </div>
-                    </div>
+                this.state.failures.map((v, i) => {
+                  if (failureDisplay[i] === "Ignore") {
+                    return false;
                   }
-                  return false;
+                  return <div className="FailureRow" key={`failureRow-${v}-${i}`}>
+                    <div className="FailureColumn">
+                      <div className={`FailureHeader${failureDisplay[i]}`}>{plural(this.state.userState.names[i])}</div>
+                    </div>
+                    <div className="FailureColumn">
+                      <div className={`FailureValue${failureDisplay[i]}`}>{this.state.failures[i]}</div>
+                    </div>
+                  </div>
                 })
               }
             </div>
@@ -608,7 +622,7 @@ class MainForm extends React.Component<{}, MainFormState> {
                 </div>
                 <div className="SizingRpw">
                   <div className="SizingColumn">
-                    <div className="SizingValue">{xbytes(this.state.specs.Storage.RealCapacity, {iec: true})} actual storage (due to the replication factor)</div>
+                    <div className="SizingValue">{xbytes(this.state.specs.Storage.RealCapacity, {iec: true})} actual storage (due to {this.state.userState.replicationFactor}x replication)</div>
                   </div>
                 </div>
                 <div className="SizingRpw">

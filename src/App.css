@@ -148,12 +148,22 @@
         padding-right: 10px;
     }
     
-    .FailureHeader {
+    .FailureHeaderDisplay {
         text-align: right;
     }
     
-    .FailureValue {
+    .FailureHeaderWarning {
+        text-align: right;
+        color: red;
+    }
+    
+    .FailureValueDisplay {
         text-align: left;
+    }
+    
+    .FailureValueWarning {
+        text-align: left;
+        color: red;
     }
     
     .Selector {
