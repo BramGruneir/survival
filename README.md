@@ -7,13 +7,9 @@ This is done by simulating a single range and placing its replicas following the
 rules of Cockroach for maximum survivability. It then finds  the maximum number of failures that
 the cluster can suffer without experiencing any unavailability.
 
-There are 4 levels, _Regions_, _Data Centers_, _Availability Zones_ and _Nodes_. But these are just
-placeholder names.  They just represent the topology of the network and can fit whatever topology
-you have.  If you want to ignore one level, just set it to 1.
-
 You can select whichever failure mode you're interested in.  Note that each failure mode occurs at a
-different level.  _Region_ failures show how many regions can fail, plus an extra lower level of
-failures.  But it cannot be combined with _Availability Zones_ failures. i.e.:
+different level.  Failures modes show how many of the current level can fail plus any extra lower
+level failures.  i.e.:
 
 If you have a 3 Region, 2 DC per Region, 3 AZ per DC and 3 Nodes per AZ setup with a replication
 factor of 9x, you can survive the following scenarios:
@@ -49,9 +45,9 @@ point.
 
 ### Requirements
 
-- Node v14.4.0 (or later)
-- NPM v6.14.5 (or later)
-- yarn v1.22.4 (or later)
+- Node v14.13.1 (or later)
+- NPM v6.14.8 (or later)
+- yarn v1.22.10 (or later)
 
 ### To Run
 
