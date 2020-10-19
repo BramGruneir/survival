@@ -17,6 +17,7 @@ const IOPS_per_vCPU = 500;
 const MBPS_per_vCPU = 30;
 const Connections_per_vCPU = 4;
 const RAM_per_vCPU = xbytes.parseBytes("4 GiB").bytes;
+const CockroachVersion = "20.2";
 
 const DefaultNamesByLevel: { [count: number]: Array<string> } = {
   1: ["Nodes"],
@@ -690,7 +691,7 @@ class MainForm extends React.Component<{}, MainFormState> {
               </div>
               <div>
                 <i>
-                  *Please note that these values are rough approximations based on some back of the envelope calculations.
+                  *Please note that these values are rough approximations based on some back of the envelope calculations for CockroachDB v{CockroachVersion}.
                 </i>
               </div>
               <div>
